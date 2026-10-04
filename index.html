@@ -429,7 +429,7 @@ function getFormArgs() {
     if (isNaN(dt.getTime())) throw new Error('时间无效');
 
     const lunar = window.Lunar.Lunar.fromDate(dt);
-    const hourZhi = lunar.getHourZhi(); // 时辰地支
+    const hourZhi = lunar.getTimeZhi(); // 时辰地支
     const dayZhi = lunar.getDayZhi();   // 日支
 
     const zhiToNum = {"子":1,"丑":2,"寅":3,"卯":4,"辰":5,"巳":6,"午":7,"未":8,"申":9,"酉":10,"戌":11,"亥":12};
@@ -503,7 +503,7 @@ function buildAIText(args, boardText) {
   md.push('## 基础信息');
   md.push(`- 起卦方式：${methodLabel(args)}`);
   md.push(`- 公历：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
-  if (lunar) md.push(`- 农历：${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()} ${lunar.getHourZhi()}时`);
+  if (lunar) md.push(`- 农历：${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()} ${lunar.getTimeZhi()}时`);
   md.push(`- 月建：${args.month_zhi} / 日干支：${args.day_gz}`);
   md.push('');
   md.push('## 卦盘原文');

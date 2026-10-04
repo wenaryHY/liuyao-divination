@@ -1,632 +1,408 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="六爻排盘 - 传统纳甲筮法">
-<meta name="theme-color" content="#000000">
-<title>六爻排盘</title>
-<link rel="manifest" href="manifest.json">
-<style>
-/* ===== 基础重置 ===== */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; -webkit-text-size-adjust: 100%; }
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: #000;
-  background: #fff;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ===== 布局 ===== */
-header, footer { padding: 0.75rem 1rem; border-bottom: 1px solid #ccc; }
-footer { border-top: 1px solid #ccc; border-bottom: none; margin-top: auto; }
-main { flex: 1; padding: 1rem; overflow: auto; }
-
-.grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-}
-@media (min-width: 900px) {
-  .grid { grid-template-columns: 320px 1fr 1fr; }
-}
-
-section {
-  border: 1px solid #ccc;
-  padding: 0.75rem;
-  background: #fafafa;
-}
-
-h1 { font-size: 1.25rem; font-weight: 700; text-align: center; }
-h2 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; border-bottom: 1px solid #ccc; padding-bottom: 0.25rem; }
-h3 { font-size: 0.875rem; font-weight: 700; margin: 0.5rem 0 0.25rem; }
-
-/* ===== 表单 ===== */
-.field { margin-bottom: 0.75rem; }
-.field label { display: block; font-weight: 700; margin-bottom: 0.25rem; font-size: 0.8125rem; }
-.field input, .field select {
-  width: 100%; padding: 0.5rem; border: 1px solid #999; background: #fff;
-  font-family: inherit; font-size: 0.875rem;
-}
-.field input:focus, .field select:focus { outline: none; border-color: #000; }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-
-/* ===== 按钮 ===== */
-.btn-group { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
-button {
-  padding: 0.625rem 1rem; border: 1px solid #000; background: #000; color: #fff;
-  font-family: inherit; font-size: 0.875rem; cursor: pointer;
-}
-button:hover { background: #333; }
-button:disabled { background: #ccc; border-color: #ccc; color: #888; cursor: not-allowed; }
-button.secondary { background: #fff; color: #000; }
-button.secondary:hover { background: #eee; }
-
-/* ===== 输出区 ===== */
-.output { font-family: "Consolas", "Monospace", monospace; font-size: 0.75rem; line-height: 1.6; }
-pre {
-  white-space: pre-wrap; word-wrap: break-word;
-  background: #fff; border: 1px solid #ddd; padding: 0.75rem;
-  max-height: 60vh; overflow: auto;
-}
-.output-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-.output-table th, .output-table td { border: 1px solid #ccc; padding: 0.25rem 0.5rem; text-align: left; }
-.output-table th { background: #eee; font-weight: 700; }
-
-/* ===== 状态 ===== */
-.status { font-size: 0.75rem; color: #666; margin: 0.5rem 0; }
-.status.ok { color: #060; }
-.status.err { color: #c00; }
-
-/* ===== 历史记录 ===== */
-.history-list { max-height: 200px; overflow: auto; font-size: 0.75rem; }
-.history-item { padding: 0.25rem 0; border-bottom: 1px dotted #ccc; cursor: pointer; }
-.history-item:hover { background: #eee; }
-
-/* ===== 进度 ===== */
-#pyodide-progress { width: 100%; height: 4px; background: #eee; margin: 0.5rem 0; }
-#pyodide-progress > div { height: 100%; background: #000; width: 0%; transition: width 0.2s; }
-</style>
-</head>
-<body>
-<header><h1>六爻排盘</h1></header>
-<main class="grid">
-  <!-- 起卦设置区 -->
-  <section id="setup">
-    <h2>起卦设置</h2>
-
-    <div class="field">
-      <label>起卦方式</label>
-      <select id="method">
-        <option value="manual">手动摆卦</option>
-        <option value="random">模拟摇卦</option>
-        <option value="time">时间起卦 (辅助)</option>
-      </select>
-    </div>
-
-    <!-- 手动摆卦 -->
-    <div id="panel-manual" class="panel">
-      <div class="field">
-        <label>卦名</label>
-        <select id="hexagram"></select>
-      </div>
-      <div class="field">
-        <label>动爻 (1-6，多爻用逗号分隔)</label>
-        <input id="moving" type="text" placeholder="例: 2 或 2,4" value="2">
-      </div>
-    </div>
-
-    <!-- 模拟摇卦 -->
-    <div id="panel-random" class="panel" hidden>
-      <p style="font-size:0.75rem;color:#666;margin-bottom:0.5rem;">模拟三钱六掷，自动推算主卦与动爻</p>
-    </div>
-
-    <!-- 时间起卦 -->
-    <div id="panel-time" class="panel" hidden>
-      <p style="font-size:0.75rem;color:#666;margin-bottom:0.5rem;">以当前时辰纳甲起卦（辅助法，非正统摇卦）</p>
-      <div class="field">
-        <label>使用时间</label>
-        <input id="use-current-time" type="checkbox" checked> 当前时间
-      </div>
-      <div class="field" id="custom-time-field" hidden>
-        <label>指定时间</label>
-        <input id="custom-time" type="datetime-local">
-      </div>
-    </div>
-
-    <!-- 通用参数 -->
-    <div class="field-row">
-      <div class="field"><label>月建</label><select id="month-zhi"></select></div>
-      <div class="field"><label>日干支</label><input id="day-gz" type="text" placeholder="例: 辛卯"></div>
-    </div>
-    <div class="field">
-      <label>用神 (可选)</label>
-      <select id="yongshen"><option value="">自动/无</option></select>
-    </div>
-
-    <div class="btn-group">
-      <button id="btn-cast" type="button">起卦</button>
-      <button id="btn-clear" type="button" class="secondary">清空</button>
-    </div>
-
-    <div id="status" class="status"></div>
-  </section>
-
-  <!-- 卦盘结果区 -->
-  <section id="board">
-    <h2>卦盘结果</h2>
-    <pre id="board-output" class="output" aria-label="卦盘文本">等待起卦...</pre>
-  </section>
-
-  <!-- AI 解卦文本区 -->
-  <section id="ai">
-    <h2>AI 解卦文本</h2>
-    <pre id="ai-output" class="output" aria-label="AI 解卦结构化文本">等待起卦...</pre>
-  </section>
-</main>
-
-<footer>
-  <div class="btn-group">
-    <button id="btn-copy-board" type="button" disabled>复制卦盘信息</button>
-    <button id="btn-copy-ai" type="button" disabled>复制 AI 文本</button>
-    <button id="btn-export-history" type="button" class="secondary">导出历史</button>
-    <button id="btn-import-history" type="button" class="secondary">导入历史</button>
-    <input id="import-file" type="file" accept=".json,.jsonl" hidden>
-  </div>
-</footer>
-
-<!-- 内联资源：liuyao Python 包 -->
-<script type="application/json" id="liuyao-pkg">
-{"liuyao\\board.py":"\"\"\"排盘主逻辑：把主卦+动爻+月日 装成完整的结构化卦盘。\n\ncast_board(...) 返回 Board 对象，含六爻的全部信息：\n阴阳、纳甲、六亲、六神、世应、动变、空亡、月破、日破、暗动、化进化退、入墓、旺衰。\n\"\"\"\n\nfrom .data import (\n    BAGUA, BAGUA_NAGAN, BAGUA_NAZHI, DIZHI_WUXING, WUXING_MU,\n    JINSHEN, TUISHEN, LIUSHEN_ORDER, LIUSHEN_START, find_hexagram, HEXAGRAMS,\n    CHONG, LIUHE,\n)\n\n# 三合局：三支 + 化出五行\nSANHE_JU = [\n    (\"申\", \"子\", \"辰\", \"水\"),\n    (\"亥\", \"卯\", \"未\", \"木\"),\n    (\"寅\", \"午\", \"戌\", \"火\"),\n    (\"巳\", \"酉\", \"丑\", \"金\"),\n]\nfrom .wuxing import (\n    liuqin, wuxing_state, shier_changsheng, is_prosperous,\n    xunkong, is_void, is_chong, yongshen_role, i_sheng, i_ke,\n    is_true_void, four_gods,\n)\n\n\ndef _yao_to_bagua(yao3):\n    \"\"\"由三爻(自下而上 [初,中,上]，1阳0阴)反查八卦名。\"\"\"\n    for name, info in BAGUA.items():\n        if info[\"yao\"] == yao3:\n            return name\n    raise ValueError(f\"无法识别的卦象: {yao3}\")\n\n\ndef _find_changed_hexagram(changed_lower_gua, changed_upper_gua):\n    \"\"\"由变卦的上下卦反查变卦全名（可能查不到组合，返回 None）。\"\"\"\n    for rec in HEXAGRAMS.values():\n        if rec[\"upper\"] == changed_upper_gua and rec[\"lower\"] == changed_lower_gua:\n            return rec[\"name\"]\n    return None\n\n\ndef _spirit_effective(ln, board):\n    \"\"\"判定元神/忌神是否有力（有效）。返回 (effective, reason)。\n\n    effective: True=有力(能生用/能克用), False=无力(见生不生/虽动不克), None=中和不定。\n    依据《增删卜易·用神元神忌神仇神章》有力五条/无用六条/忌神不克七条综合。\n    \"\"\"\n    # —— 明显无力（任一命中即无力）——\n    if ln.month_break:\n        return (False, \"月破无力\")\n    if ln.in_grave:\n        return (False, \"入墓无力\")\n    if ln.jin_tui == \"化回头克\":\n        return (False, \"化回头克无力\")\n    if ln.jin_tui == \"化退神\":\n        return (False, \"化退神无力\")\n    if ln.day_break:\n        return (False, \"日破无力\")\n    if ln.true_void:\n        return (False, \"真空无力\")\n    if ln.state in (\"囚\", \"死\") and ln.void:\n        return (False, \"休囚旬空无力\")\n    if ln.state in (\"囚\", \"死\") and not ln.is_moving and not ln.dark_move:\n        return (False, \"休囚不动无力\")\n    if ln.state in (\"囚\", \"死\") and ln.stage in (\"绝\", \"墓\", \"死\") and not ln.is_moving:\n        return (False, \"衰绝无力\")\n\n    # —— 有力（任一命中即有力）——\n    if ln.is_on_month or ln.is_on_day:\n        return (True, \"临日月有力\")\n    if ln.state in (\"旺\", \"相\"):\n        return (True, \"旺相有力\")\n    if ln.jin_tui in (\"化回头生\", \"化进神\"):\n        return (True, f\"{ln.jin_tui}有力\")\n    if ln.is_moving or ln.dark_move:\n        return (True, \"发动有力\")\n\n    return (None, \"中和\")\n\n\ndef _analyze_gua_bian(board):\n    \"\"\"卦变生克：以主卦宫五行 vs 变卦宫五行（《增删卜易·卦变生克墓绝章》）。\n\n    变生/变比和为吉，变克为凶。\n    \"\"\"\n    main_wx = board.palace_wx\n    ch_name = board.changed_hexagram\n    if not ch_name:\n        board.gua_bian = \"变卦未明\"\n        return\n    ch_rec = find_hexagram(ch_name)\n    if not ch_rec:\n        board.gua_bian = \"变卦未明\"\n        return\n    ch_wx = ch_rec[\"palace_wx\"]\n    if ch_wx == main_wx:\n        board.gua_bian = \"变比和(吉)\"\n    elif i_sheng(ch_wx) == main_wx:\n        board.gua_bian = \"变生主(吉)\"\n    elif i_ke(ch_wx) == main_wx:\n        board.gua_bian = \"变克主(凶)\"\n    elif i_sheng(main_wx) == ch_wx:\n        board.gua_bian = \"主生变(泄)\"\n    elif i_ke(main_wx) == ch_wx:\n        board.gua_bian = \"主克变(制)\"\n    else:\n        board.gua_bian = \"无\"\n\n\ndef _detect_fu_fan_yin(board):\n    \"\"\"伏吟：主卦六爻地支全等于变卦地支(卦变而地支不变)。\n    反吟(简化)：所有动爻皆化回头冲(变爻地支冲动爻地支)。\"\"\"\n    moving = board.moving_lines\n    if not moving:\n        return\n    orig_zhi = [ln.zhi for ln in board.lines]\n    changed_zhi = [ln.change_zhi if ln.is_moving else ln.zhi for ln in board.lines]\n    if changed_zhi == orig_zhi:\n        board.fu_yin = True\n    if all(CHONG.get(ln.zhi) == ln.change_zhi for ln in moving):\n        board.fan_yin = True\n\n\ndef _detect_sanhe(board):\n    \"\"\"检测三合成局（《增删卜易·三合章》）：明动+暗动皆算动爻。\n\n    三支齐于卦内 + 动爻≥2 → 实成之局；\n    三支齐于卦内 + 动爻<2 → 虚合待用(支齐动不足)；\n    支不全(有支在月日不在卦) → 虚合(待填实)。\n    \"\"\"\n    board_zhi = {ln.zhi for ln in board.lines}\n    moving_zhi = {ln.zhi for ln in board.lines if ln.is_moving or ln.dark_move}\n    result = {}\n    for a, b, c, wx in SANHE_JU:\n        tri = (a, b, c)\n        in_board_zhi = [z for z in tri if z in board_zhi]\n        if not in_board_zhi:\n            continue\n        moving_count = sum(1 for z in tri if z in moving_zhi)\n        if len(in_board_zhi) == 3:\n            status = \"实成之局\" if moving_count >= 2 else \"虚合待用(支齐动不足)\"\n        else:\n            missing = [z for z in tri if z not in board_zhi]\n            status = f\"虚合(缺{''.join(missing)}，待填实)\"\n        result[f\"{a}{b}{c}{wx}局\"] = {\n            \"status\": status,\n            \"moving_count\": moving_count,\n            \"branches_in_board\": in_board_zhi,\n        }\n    board.sanhe = result\n\n\ndef _detect_liuhe_liuchong(board, ch_lower, ch_upper):\n    \"\"\"检测六合卦/六冲卦（《增删卜易·六合章/六冲章》）。\n\n    六合卦：初四、二五、三上 三对皆地支六合；六冲卦：三对皆六冲。主卦、变卦各检测。\n    \"\"\"\n    pairs = [(0, 3), (1, 4), (2, 5)]  # 初四 / 二五 / 三上（0 基）\n\n    def check(zhi6):\n        he = all(LIUHE[zhi6[a]] == zhi6[b] for a, b in pairs)\n        ch = all(CHONG[zhi6[a]] == zhi6[b] for a, b in pairs)\n        return he, ch\n\n    main = [l.zhi for l in board.lines]\n    board.is_liuhe_gua, board.is_liuchong_gua = check(main)\n    ch6 = BAGUA_NAZHI[ch_lower][:3] + BAGUA_NAZHI[ch_upper][3:]\n    board.changed_is_liuhe, board.changed_is_liuchong = check(ch6)\n\n\nclass Line:\n    \"\"\"单爻信息。\"\"\"\n\n    def __init__(self, position):\n        self.position = position            # 1..6\n        self.name = {1: \"初\", 2: \"二\", 3: \"三\", 4: \"四\", 5: \"五\", 6: \"上\"}[position]\n        self.yin_yang = None                # \"阳\"/\"阴\"\n        self.gan = None                     # 天干\n        self.zhi = None                     # 地支\n        self.wx = None                      # 爻五行\n        self.qin = None                     # 六亲\n        self.shen = None                    # 六神\n        self.is_world = False\n        self.is_response = False\n        self.is_moving = False\n        # 动爻变爻\n        self.change_gan = None\n        self.change_zhi = None\n        self.change_wx = None\n        self.change_qin = None\n        # 状态标记\n        self.void = False                   # 空亡\n        self.month_break = False            # 月破\n        self.day_strike = False             # 被日冲\n        self.dark_move = False              # 暗动\n        self.day_break = False              # 日破\n        self.prosperous = False             # 旺相\n        self.jin_tui = None                 # \"化进神\"/\"化退神\"/\"化回头生\"/\"化回头克\"/\"化比和\"\n        self.in_grave = []                  # 入墓原因列表\n        self.grave_is_void = False          # 是否入空墓\n        self.stage = None                   # 十二长生阶段\n        self.state = None                   # 旺相休囚死\n        self.role = None                    # 相对用神的四神角色(用/元/忌/仇/闲)\n        # —— 扩展判定 ——\n        self.is_on_day = False              # 临日建(爻支==日支)\n        self.is_on_month = False            # 临月建(爻支==月支)\n        self.true_void = False              # 真空(旬空且当季死地)\n        self.day_strike_moving = None       # 动爻被日冲：\"动而愈动\"/\"动而冲散\"\n        self.effective = None               # 元神/忌神是否有力 True/False/None\n        self.effective_reason = \"\"          # 有力/无力理由\n\n    def label(self):\n        \"\"\"组合标注，用于展示。\"\"\"\n        tags = []\n        if self.is_world:\n            tags.append(\"世\")\n        if self.is_response:\n            tags.append(\"应\")\n        if self.is_moving:\n            tags.append(\"动\")\n        if self.void:\n            tags.append(\"空\")\n        if self.month_break:\n            tags.append(\"月破\")\n        if self.dark_move:\n            tags.append(\"暗动\")\n        if self.day_break:\n            tags.append(\"日破\")\n        if self.is_on_month:\n            tags.append(\"临月建\")\n        if self.is_on_day:\n            tags.append(\"临日建\")\n        if self.true_void:\n            tags.append(\"真空\")\n        if self.day_strike_moving:\n            tags.append(self.day_strike_moving)\n        if self.jin_tui:\n            tags.append(self.jin_tui)\n        for g in self.in_grave:\n            tags.append(g)\n        if self.grave_is_void:\n            tags.append(\"空墓\")\n        return tags\n\n\nclass Board:\n    \"\"\"完整卦盘。\"\"\"\n\n    def __init__(self):\n        self.hexagram = None\n        self.changed_hexagram = None\n        self.palace = None\n        self.palace_wx = None\n        self.world_pos = None\n        self.response_pos = None\n        self.month_zhi = None\n        self.month_wx = None\n        self.day_gz = None\n        self.day_gan = None\n        self.day_zhi = None\n        self.day_wx = None\n        self.xunkong = None                 # (支,支)\n        self.lines = [Line(i) for i in range(1, 7)]\n        self.yongshen_qin = None\n        self.yongshen_lines = []\n        self.yongshen_wx = None             # 用神爻五行(四神判定基准)\n        # —— 卦级分析 ——\n        self.gua_bian = None                # 卦变生克(主宫vs变宫)\n        self.fu_yin = False                 # 伏吟\n        self.fan_yin = False                # 反吟\n        self.sanhe = {}                     # 三合局检测结果\n        self.is_liuhe_gua = False           # 主卦六合卦\n        self.is_liuchong_gua = False        # 主卦六冲卦\n        self.changed_is_liuhe = False       # 变卦六合卦\n        self.changed_is_liuchong = False    # 变卦六冲卦\n        self.changed_lower_gua = None       # 变卦下卦名\n        self.changed_upper_gua = None       # 变卦上卦名\n\n    def line(self, pos):\n        return self.lines[pos - 1]\n\n    @property\n    def moving_lines(self):\n        return [l for l in self.lines if l.is_moving]\n\n    def changed_line_info(self):\n        \"\"\"变卦六爻完整信息（初..上）：[{pos,yin_yang,gan,zhi,qin,shen}]。\n\n        纳甲/六亲按变卦本身排（六亲仍以主卦宫为我）；六神同主卦同位置（日干起，按爻位）。\n        \"\"\"\n        lower_gan = BAGUA_NAGAN[self.changed_lower_gua][0]\n        upper_gan = BAGUA_NAGAN[self.changed_upper_gua][1]\n        lower_zhi = BAGUA_NAZHI[self.changed_lower_gua][:3]\n        upper_zhi = BAGUA_NAZHI[self.changed_upper_gua][3:]\n        info = []\n        for pos in range(1, 7):\n            ln = self.line(pos)\n            yy = (\"阴\" if ln.yin_yang == \"阳\" else \"阳\") if ln.is_moving else ln.yin_yang\n            if pos <= 3:\n                gan, zhi = lower_gan, lower_zhi[pos - 1]\n            else:\n                gan, zhi = upper_gan, upper_zhi[pos - 4]\n            wx = DIZHI_WUXING[zhi]\n            info.append({\n                \"pos\": pos, \"yin_yang\": yy,\n                \"gan\": gan, \"zhi\": zhi,\n                \"qin\": liuqin(wx, self.palace_wx),\n                \"shen\": ln.shen,\n            })\n        return info\n\n\ndef cast_board(hexagram, moving, month_zhi, day_gz, yongshen_qin=None):\n    \"\"\"排盘。\n\n    Args:\n        hexagram: 卦名（全名\"地泽临\"或单字\"临\"）。\n        moving: 动爻位置，int 或 list[int]（1..6）。\n        month_zhi: 月建地支，如 \"未\"。\n        day_gz: 日干支，如 \"辛卯\"（完整两天字符）。\n        yongshen_qin: 可选，用神六亲名（\"妻财\"等），用于标注各爻角色。\n\n    Returns:\n        Board 对象。\n    \"\"\"\n    rec = find_hexagram(hexagram)\n    if rec is None:\n        raise ValueError(f\"未找到卦: {hexagram}\")\n\n    if isinstance(moving, int):\n        moving = [moving]\n    moving_set = set(moving)\n\n    board = Board()\n    board.hexagram = rec[\"name\"]\n    board.palace = rec[\"palace\"]\n    board.palace_wx = rec[\"palace_wx\"]\n    board.world_pos = rec[\"world\"]\n    board.response_pos = ((board.world_pos - 1 + 3) % 6) + 1\n\n    board.month_zhi = month_zhi\n    board.month_wx = DIZHI_WUXING[month_zhi]\n    board.day_gz = day_gz\n    board.day_gan = day_gz[0]\n    board.day_zhi = day_gz[1]\n    board.day_wx = DIZHI_WUXING[board.day_zhi]\n    board.xunkong = xunkong(day_gz)\n    board.yongshen_qin = yongshen_qin\n\n    upper, lower = rec[\"upper\"], rec[\"lower\"]\n    lower_yao = BAGUA[lower][\"yao\"]\n    upper_yao = BAGUA[upper][\"yao\"]\n    six_yao = lower_yao + upper_yao  # 初..上\n\n    # 变卦（动爻阴阳翻转）\n    changed_yao = [(1 - y if (i + 1) in moving_set else y) for i, y in enumerate(six_yao)]\n    changed_lower_gua = _yao_to_bagua(changed_yao[0:3])\n    changed_upper_gua = _yao_to_bagua(changed_yao[3:6])\n    board.changed_hexagram = _find_changed_hexagram(changed_lower_gua, changed_upper_gua)\n    board.changed_lower_gua = changed_lower_gua\n    board.changed_upper_gua = changed_upper_gua\n\n    # 六神起例\n    start_shen = LIUSHEN_START[board.day_gan]\n    start_idx = LIUSHEN_ORDER.index(start_shen)\n\n    # 装每爻\n    lower_gan, upper_gan = BAGUA_NAGAN[lower][0], BAGUA_NAGAN[upper][1]\n    lower_zhi = BAGUA_NAZHI[lower][:3]\n    upper_zhi = BAGUA_NAZHI[upper][3:]\n\n    for pos in range(1, 7):\n        ln = board.line(pos)\n        idx = pos - 1\n        ln.yin_yang = \"阳\" if six_yao[idx] == 1 else \"阴\"\n        if pos <= 3:\n            ln.gan = lower_gan\n            ln.zhi = lower_zhi[idx]\n        else:\n            ln.gan = upper_gan\n            ln.zhi = upper_zhi[idx - 3]\n        ln.wx = DIZHI_WUXING[ln.zhi]\n        ln.qin = liuqin(ln.wx, board.palace_wx)\n        ln.shen = LIUSHEN_ORDER[(start_idx + idx) % 6]\n        ln.is_world = (pos == board.world_pos)\n        ln.is_response = (pos == board.response_pos)\n        ln.is_moving = pos in moving_set\n\n        # 旺衰\n        ln.state = wuxing_state(ln.wx, board.month_wx)\n        ln.stage = shier_changsheng(ln.wx, ln.zhi)\n        ln.prosperous = is_prosperous(ln.wx, ln.zhi, board.month_zhi, board.day_zhi)\n\n        # 空亡\n        ln.void = is_void(ln.zhi, day_gz)\n        ln.true_void = ln.void and is_true_void(ln.wx, board.month_zhi)\n        # 月破\n        ln.month_break = is_chong(board.month_zhi, ln.zhi)\n        # 日冲\n        ln.day_strike = is_chong(board.day_zhi, ln.zhi)\n        # 临日月建\n        ln.is_on_month = (ln.zhi == board.month_zhi)\n        ln.is_on_day = (ln.zhi == board.day_zhi)\n        # 暗动 / 日破（静爻被日冲）\n        if ln.day_strike and not ln.is_moving:\n            if ln.prosperous:\n                ln.dark_move = True\n            else:\n                ln.day_break = True\n        # 动爻被日冲（《增删卜易·日辰章》：旺动愈动，衰动冲散）\n        if ln.day_strike and ln.is_moving:\n            ln.day_strike_moving = \"动而愈动\" if ln.prosperous else \"动而冲散\"\n\n    # 动爻变爻\n    ch_lower_gan, ch_upper_gan = BAGUA_NAGAN[changed_lower_gua][0], BAGUA_NAGAN[changed_upper_gua][1]\n    ch_lower_zhi = BAGUA_NAZHI[changed_lower_gua][:3]\n    ch_upper_zhi = BAGUA_NAZHI[changed_upper_gua][3:]\n\n    for ln in board.moving_lines:\n        p = ln.position\n        if p <= 3:\n            ln.change_gan = ch_lower_gan\n            ln.change_zhi = ch_lower_zhi[p - 1]\n        else:\n            ln.change_gan = ch_upper_gan\n            ln.change_zhi = ch_upper_zhi[p - 4]\n        ln.change_wx = DIZHI_WUXING[ln.change_zhi]\n        ln.change_qin = liuqin(ln.change_wx, board.palace_wx)\n\n        # 化进退 / 回头生克\n        if ln.wx == ln.change_wx:\n            if JINSHEN.get(ln.zhi) == ln.change_zhi:\n                ln.jin_tui = \"化进神\"\n            elif TUISHEN.get(ln.zhi) == ln.change_zhi:\n                ln.jin_tui = \"化退神\"\n            else:\n                ln.jin_tui = \"化比和\"\n        else:\n            if i_sheng(ln.change_wx) == ln.wx:\n                ln.jin_tui = \"化回头生\"\n            elif i_ke(ln.change_wx) == ln.wx:\n                ln.jin_tui = \"化回头克\"\n            else:\n                ln.jin_tui = \"化他\"\n\n    # 入墓\n    for ln in board.lines:\n        mu = WUXING_MU[ln.wx]\n        reasons = []\n        if board.month_zhi == mu:\n            reasons.append(\"月墓\")\n        if board.day_zhi == mu:\n            reasons.append(\"日墓\")\n        for other in board.lines:\n            if other.is_moving and other.zhi == mu and other.position != ln.position:\n                reasons.append(\"动爻墓\")\n        if ln.is_moving and ln.change_zhi == mu:\n            reasons.append(\"化墓\")\n        ln.in_grave = reasons\n        # 空墓：入墓 且 墓库地支落空亡\n        if reasons and mu in board.xunkong:\n            ln.grave_is_void = True\n\n    # 用神四神角色 + 元神/忌神有力无力（以用神爻五行为基准）\n    if yongshen_qin:\n        for ln in board.lines:\n            if ln.qin == yongshen_qin:\n                board.yongshen_lines.append(ln)\n        # 用神五行基准：取最旺者，否则取第一个\n        if board.yongshen_lines:\n            ys_sorted = sorted(\n                board.yongshen_lines,\n                key=lambda l: (l.is_on_month or l.is_on_day, l.prosperous,\n                               l.state in (\"旺\", \"相\")),\n                reverse=True,\n            )\n            yongshen_wx = ys_sorted[0].wx\n        else:\n            yongshen_wx = None\n        board.yongshen_wx = yongshen_wx\n        for ln in board.lines:\n            ln.role = yongshen_role(ln.wx, yongshen_wx) if yongshen_wx else None\n            if ln in board.yongshen_lines:\n                ln.role = \"用神\"\n            # 元神/忌神判有力无力\n            if ln.role in (\"元神\", \"忌神\"):\n                eff, reason = _spirit_effective(ln, board)\n                ln.effective = eff\n                ln.effective_reason = reason\n\n    # —— 卦级分析：卦变生克 / 反伏 / 三合 / 六合六冲卦 ——\n    _analyze_gua_bian(board)\n    _detect_fu_fan_yin(board)\n    _detect_sanhe(board)\n    _detect_liuhe_liuchong(board, changed_lower_gua, changed_upper_gua)\n\n    return board\n","liuyao\\data.py":"\"\"\"六爻排盘静态数据。\n\n包含：八卦属性、八卦纳甲（六爻天干地支）、六十四卦（宫属/世爻/上下卦）、\n五行生克、地支五行、地支冲、五行墓库、化进化退、旬空等。\n\n所有数据为主流综合派（《增删卜易》一脉）的标准取值。\n\"\"\"\n\n# ============================================================\n# 天干 / 地支\n# ============================================================\nTIANGAN = \"甲乙丙丁戊己庚辛壬癸\"\nDIZHI = \"子丑寅卯辰巳午未申酉戌亥\"\n\n# 地支 -> 五行\nDIZHI_WUXING = {\n    \"子\": \"水\", \"丑\": \"土\", \"寅\": \"木\", \"卯\": \"木\", \"辰\": \"土\", \"巳\": \"火\",\n    \"午\": \"火\", \"未\": \"土\", \"申\": \"金\", \"酉\": \"金\", \"戌\": \"土\", \"亥\": \"水\",\n}\n\n# 地支相冲\nCHONG = {\n    \"子\": \"午\", \"午\": \"子\", \"丑\": \"未\", \"未\": \"丑\", \"寅\": \"申\", \"申\": \"寅\",\n    \"卯\": \"酉\", \"酉\": \"卯\", \"辰\": \"戌\", \"戌\": \"辰\", \"巳\": \"亥\", \"亥\": \"巳\",\n}\n\n# 地支六合\nLIUHE = {\n    \"子\": \"丑\", \"丑\": \"子\", \"寅\": \"亥\", \"亥\": \"寅\", \"卯\": \"戌\", \"戌\": \"卯\",\n    \"辰\": \"酉\", \"酉\": \"辰\", \"巳\": \"申\", \"申\": \"巳\", \"午\": \"未\", \"未\": \"午\",\n}\n\n# ============================================================\n# 五行\n# ============================================================\nWUXING = [\"木\", \"火\", \"土\", \"金\", \"水\"]\n\n# 五行相生：我 -> 我生\nWUXING_SHENG = {\"木\": \"火\", \"火\": \"土\", \"土\": \"金\", \"金\": \"水\", \"水\": \"木\"}\n\n# 五行相克：我 -> 我克\nWUXING_KE = {\"木\": \"土\", \"土\": \"水\", \"水\": \"火\", \"火\": \"金\", \"金\": \"木\"}\n\n# 五行墓库（地支）\nWUXING_MU = {\"木\": \"未\", \"火\": \"戌\", \"金\": \"丑\", \"水\": \"辰\", \"土\": \"辰\"}\n\n# 化进神：动爻地支 -> 变爻地支（同五行，地支前进）\nJINSHEN = {\n    \"寅\": \"卯\", \"巳\": \"午\", \"申\": \"酉\", \"亥\": \"子\",\n    \"丑\": \"辰\", \"辰\": \"未\", \"未\": \"戌\",\n}\n# 化退神：进神的反向\nTUISHEN = {v: k for k, v in JINSHEN.items()}\n\n# ============================================================\n# 八卦\n# ============================================================\n# 八卦：爻象自下而上 [初, 中, 上]（1=阳, 0=阴），五行，自然象\nBAGUA = {\n    \"乾\": {\"yao\": [1, 1, 1], \"wx\": \"金\", \"xiang\": \"天\"},\n    \"兑\": {\"yao\": [1, 1, 0], \"wx\": \"金\", \"xiang\": \"泽\"},\n    \"离\": {\"yao\": [1, 0, 1], \"wx\": \"火\", \"xiang\": \"火\"},\n    \"震\": {\"yao\": [1, 0, 0], \"wx\": \"木\", \"xiang\": \"雷\"},\n    \"巽\": {\"yao\": [0, 1, 1], \"wx\": \"木\", \"xiang\": \"风\"},\n    \"坎\": {\"yao\": [0, 1, 0], \"wx\": \"水\", \"xiang\": \"水\"},\n    \"艮\": {\"yao\": [0, 0, 1], \"wx\": \"土\", \"xiang\": \"山\"},\n    \"坤\": {\"yao\": [0, 0, 0], \"wx\": \"土\", \"xiang\": \"地\"},\n}\n\n# 八卦纳干：内卦(下) / 外卦(上)\nBAGUA_NAGAN = {\n    \"乾\": (\"甲\", \"壬\"), \"坤\": (\"乙\", \"癸\"), \"坎\": (\"戊\", \"戊\"), \"离\": (\"己\", \"己\"),\n    \"震\": (\"庚\", \"庚\"), \"巽\": (\"辛\", \"辛\"), \"艮\": (\"丙\", \"丙\"), \"兑\": (\"丁\", \"丁\"),\n}\n\n# 八卦纳支：六爻地支（顺序：初爻→上爻，即内卦三爻 + 外卦三爻）\nBAGUA_NAZHI = {\n    \"乾\": [\"子\", \"寅\", \"辰\", \"午\", \"申\", \"戌\"],\n    \"坤\": [\"未\", \"巳\", \"卯\", \"丑\", \"亥\", \"酉\"],\n    \"坎\": [\"寅\", \"辰\", \"午\", \"申\", \"戌\", \"子\"],\n    \"离\": [\"卯\", \"丑\", \"亥\", \"酉\", \"未\", \"巳\"],\n    \"震\": [\"子\", \"寅\", \"辰\", \"午\", \"申\", \"戌\"],\n    \"巽\": [\"丑\", \"亥\", \"酉\", \"未\", \"巳\", \"卯\"],\n    \"艮\": [\"辰\", \"午\", \"申\", \"戌\", \"子\", \"寅\"],\n    \"兑\": [\"巳\", \"卯\", \"丑\", \"亥\", \"酉\", \"未\"],\n}\n\n# ============================================================\n# 六神\n# ============================================================\nLIUSHEN_ORDER = [\"青龙\", \"朱雀\", \"勾陈\", \"螣蛇\", \"白虎\", \"玄武\"]\n\n# 日干 -> 初爻所起六神\nLIUSHEN_START = {\n    \"甲\": \"青龙\", \"乙\": \"青龙\",\n    \"丙\": \"朱雀\", \"丁\": \"朱雀\",\n    \"戊\": \"勾陈\",\n    \"己\": \"螣蛇\",\n    \"庚\": \"白虎\", \"辛\": \"白虎\",\n    \"壬\": \"玄武\", \"癸\": \"玄武\",\n}\n\n# 六神性情（供解读参考）\nLIUSHEN_NATURE = {\n    \"青龙\": \"喜庆、桃花、文书\",\n    \"朱雀\": \"口舌、是非、消息\",\n    \"勾陈\": \"拖延、牵缠、旧事\",\n    \"螣蛇\": \"虚惊、怪异、纠缠\",\n    \"白虎\": \"血光、丧服、刚猛\",\n    \"玄武\": \"暗昧、隐私、欺骗\",\n}\n\n# ============================================================\n# 旬空（按旬号 0..5）\n# ============================================================\n# 旬号 = 六十甲子序号 // 10\nXUNKONG_BY_XUN = [\n    (\"戌\", \"亥\"),  # 甲子旬\n    (\"申\", \"酉\"),  # 甲戌旬\n    (\"午\", \"未\"),  # 甲申旬\n    (\"辰\", \"巳\"),  # 甲午旬\n    (\"寅\", \"卯\"),  # 甲辰旬\n    (\"子\", \"丑\"),  # 甲寅旬\n]\n\n# ============================================================\n# 十二长生（用于旺衰辅助判定）\n# ============================================================\n# 每行的十二长生地支序列（长生→养，对应地支顺序由各行长生位起顺行）\nSHIER_CHANGSHENG_START = {\"木\": \"亥\", \"火\": \"寅\", \"金\": \"巳\", \"水\": \"申\", \"土\": \"寅\"}\nSHIER_NAMES = [\"长生\", \"沐浴\", \"冠带\", \"临官\", \"帝旺\", \"衰\",\n               \"病\", \"死\", \"墓\", \"绝\", \"胎\", \"养\"]\n# 进气旺相的阶段\nSHIER_STRONG = {\"长生\", \"冠带\", \"临官\", \"帝旺\"}\nSHIER_WEAK = {\"衰\", \"病\", \"死\", \"墓\", \"绝\"}\n\n\n# ============================================================\n# 六十四卦\n# ============================================================\n# 每个卦：(全名, 单字别名, 上卦, 下卦, 宫, 宫五行, 世爻位置1-6)\n# 世爻：八纯=6, 一世=1, 二世=2, 三世=3, 四世=4, 五世=5, 游魂=4, 归魂=3\n_HEX = [\n    # 乾宫（金）\n    (\"乾为天\", \"乾\", \"乾\", \"乾\", \"乾\", \"金\", 6),\n    (\"天风姤\", \"姤\", \"乾\", \"巽\", \"乾\", \"金\", 1),\n    (\"天山遁\", \"遁\", \"乾\", \"艮\", \"乾\", \"金\", 2),\n    (\"天地否\", \"否\", \"乾\", \"坤\", \"乾\", \"金\", 3),\n    (\"风地观\", \"观\", \"巽\", \"坤\", \"乾\", \"金\", 4),\n    (\"山地剥\", \"剥\", \"艮\", \"坤\", \"乾\", \"金\", 5),\n    (\"火地晋\", \"晋\", \"离\", \"坤\", \"乾\", \"金\", 4),   # 游魂\n    (\"火天大有\", \"大有\", \"离\", \"乾\", \"乾\", \"金\", 3),  # 归魂\n    # 兑宫（金）\n    (\"兑为泽\", \"兑\", \"兑\", \"兑\", \"兑\", \"金\", 6),\n    (\"泽水困\", \"困\", \"兑\", \"坎\", \"兑\", \"金\", 1),\n    (\"泽地萃\", \"萃\", \"兑\", \"坤\", \"兑\", \"金\", 2),\n    (\"泽山咸\", \"咸\", \"兑\", \"艮\", \"兑\", \"金\", 3),\n    (\"水山蹇\", \"蹇\", \"坎\", \"艮\", \"兑\", \"金\", 4),\n    (\"地山谦\", \"谦\", \"坤\", \"艮\", \"兑\", \"金\", 5),\n    (\"雷山小过\", \"小过\", \"震\", \"艮\", \"兑\", \"金\", 4),  # 游魂\n    (\"雷泽归妹\", \"归妹\", \"震\", \"兑\", \"兑\", \"金\", 3),  # 归魂\n    # 离宫（火）\n    (\"离为火\", \"离\", \"离\", \"离\", \"离\", \"火\", 6),\n    (\"火山旅\", \"旅\", \"离\", \"艮\", \"离\", \"火\", 1),\n    (\"火风鼎\", \"鼎\", \"离\", \"巽\", \"离\", \"火\", 2),\n    (\"火水未济\", \"未济\", \"离\", \"坎\", \"离\", \"火\", 3),\n    (\"山水蒙\", \"蒙\", \"艮\", \"坎\", \"离\", \"火\", 4),\n    (\"风水涣\", \"涣\", \"巽\", \"坎\", \"离\", \"火\", 5),\n    (\"天水讼\", \"讼\", \"乾\", \"坎\", \"离\", \"火\", 4),   # 游魂\n    (\"天火同人\", \"同人\", \"乾\", \"离\", \"离\", \"火\", 3),  # 归魂\n    # 震宫（木）\n    (\"震为雷\", \"震\", \"震\", \"震\", \"震\", \"木\", 6),\n    (\"雷地豫\", \"豫\", \"震\", \"坤\", \"震\", \"木\", 1),\n    (\"雷水解\", \"解\", \"震\", \"坎\", \"震\", \"木\", 2),\n    (\"雷风恒\", \"恒\", \"震\", \"巽\", \"震\", \"木\", 3),\n    (\"地风升\", \"升\", \"坤\", \"巽\", \"震\", \"木\", 4),\n    (\"水风井\", \"井\", \"坎\", \"巽\", \"震\", \"木\", 5),\n    (\"泽风大过\", \"大过\", \"兑\", \"巽\", \"震\", \"木\", 4),  # 游魂\n    (\"泽雷随\", \"随\", \"兑\", \"震\", \"震\", \"木\", 3),   # 归魂\n    # 巽宫（木）\n    (\"巽为风\", \"巽\", \"巽\", \"巽\", \"巽\", \"木\", 6),\n    (\"风天小畜\", \"小畜\", \"巽\", \"乾\", \"巽\", \"木\", 1),\n    (\"风火家人\", \"家人\", \"巽\", \"离\", \"巽\", \"木\", 2),\n    (\"风雷益\", \"益\", \"巽\", \"震\", \"巽\", \"木\", 3),\n    (\"天雷无妄\", \"无妄\", \"乾\", \"震\", \"巽\", \"木\", 4),\n    (\"火雷噬嗑\", \"噬嗑\", \"离\", \"震\", \"巽\", \"木\", 5),\n    (\"山雷颐\", \"颐\", \"艮\", \"震\", \"巽\", \"木\", 4),   # 游魂\n    (\"山风蛊\", \"蛊\", \"艮\", \"巽\", \"巽\", \"木\", 3),   # 归魂\n    # 坎宫（水）\n    (\"坎为水\", \"坎\", \"坎\", \"坎\", \"坎\", \"水\", 6),\n    (\"水泽节\", \"节\", \"坎\", \"兑\", \"坎\", \"水\", 1),\n    (\"水雷屯\", \"屯\", \"坎\", \"震\", \"坎\", \"水\", 2),\n    (\"水火既济\", \"既济\", \"坎\", \"离\", \"坎\", \"水\", 3),\n    (\"泽火革\", \"革\", \"兑\", \"离\", \"坎\", \"水\", 4),\n    (\"雷火丰\", \"丰\", \"震\", \"离\", \"坎\", \"水\", 5),\n    (\"地火明夷\", \"明夷\", \"坤\", \"离\", \"坎\", \"水\", 4),  # 游魂\n    (\"地水师\", \"师\", \"坤\", \"坎\", \"坎\", \"水\", 3),   # 归魂\n    # 艮宫（土）\n    (\"艮为山\", \"艮\", \"艮\", \"艮\", \"艮\", \"土\", 6),\n    (\"山火贲\", \"贲\", \"艮\", \"离\", \"艮\", \"土\", 1),\n    (\"山天大畜\", \"大畜\", \"艮\", \"乾\", \"艮\", \"土\", 2),\n    (\"山泽损\", \"损\", \"艮\", \"兑\", \"艮\", \"土\", 3),\n    (\"火泽睽\", \"睽\", \"离\", \"兑\", \"艮\", \"土\", 4),\n    (\"天泽履\", \"履\", \"乾\", \"兑\", \"艮\", \"土\", 5),\n    (\"风泽中孚\", \"中孚\", \"巽\", \"兑\", \"艮\", \"土\", 4),  # 游魂\n    (\"风山渐\", \"渐\", \"巽\", \"艮\", \"艮\", \"土\", 3),   # 归魂\n    # 坤宫（土）\n    (\"坤为地\", \"坤\", \"坤\", \"坤\", \"坤\", \"土\", 6),\n    (\"地雷复\", \"复\", \"坤\", \"震\", \"坤\", \"土\", 1),\n    (\"地泽临\", \"临\", \"坤\", \"兑\", \"坤\", \"土\", 2),\n    (\"地天泰\", \"泰\", \"坤\", \"乾\", \"坤\", \"土\", 3),\n    (\"雷天大壮\", \"大壮\", \"震\", \"乾\", \"坤\", \"土\", 4),\n    (\"泽天夬\", \"夬\", \"兑\", \"乾\", \"坤\", \"土\", 5),\n    (\"水天需\", \"需\", \"坎\", \"乾\", \"坤\", \"土\", 4),   # 游魂\n    (\"水地比\", \"比\", \"坎\", \"坤\", \"坤\", \"土\", 3),   # 归魂\n]\n\n\ndef _build_hex_index():\n    \"\"\"构建卦名索引（全名 + 单字别名均可查）。\"\"\"\n    idx = {}\n    for name, alias, upper, lower, palace, palace_wx, world in _HEX:\n        rec = {\n            \"name\": name, \"alias\": alias, \"upper\": upper, \"lower\": lower,\n            \"palace\": palace, \"palace_wx\": palace_wx, \"world\": world,\n        }\n        idx[name] = rec\n        idx[alias] = rec\n    return idx\n\n\nHEXAGRAMS = _build_hex_index()\n\n\ndef find_hexagram(key):\n    \"\"\"按全名、单字别名或'上下卦'查找卦。返回卦记录 dict 或 None。\"\"\"\n    if key in HEXAGRAMS:\n        return HEXAGRAMS[key]\n    # 去空格再试\n    k = key.replace(\" \", \"\").strip()\n    if k in HEXAGRAMS:\n        return HEXAGRAMS[k]\n    return None\n","liuyao\\format.py":"\"\"\"卦盘文本格式化输出。\"\"\"\n\nfrom .board import Board\n\n\ndef yao_name(pos, yin_yang):\n    \"\"\"生成爻位名：阳爻九X，阴爻六X。\"\"\"\n    nine_six = \"九\" if yin_yang == \"阳\" else \"六\"\n    if pos == 1:\n        return \"初\" + nine_six\n    if pos == 6:\n        return \"上\" + nine_six\n    return nine_six + {2: \"二\", 3: \"三\", 4: \"四\", 5: \"五\"}[pos]\n\n\ndef format_board(board: Board) -> str:\n    \"\"\"把卦盘格式化为文本表格（上爻在上）。\"\"\"\n    out = []\n    out.append(f\"占时：{board.month_zhi}月 {board.day_gz}日（旬空：{'、'.join(board.xunkong)}）\")\n    out.append(\n        f\"主卦：{board.hexagram}（{board.palace}宫·{board.palace_wx}）\"\n        f\" → 变卦：{board.changed_hexagram or '（无）'}\"\n    )\n    moving = \"、\".join(yao_name(l.position, l.yin_yang) for l in board.moving_lines) or \"无\"\n    out.append(f\"世在{board.world_pos}爻，应在{board.response_pos}爻；动爻：{moving}\")\n    if board.yongshen_qin:\n        ys = \"、\".join(f\"{yao_name(l.position, l.yin_yang)}({l.gan}{l.zhi})\" for l in board.yongshen_lines)\n        out.append(f\"用神（{board.yongshen_qin}）：{ys}\")\n    out.append(\"\")\n\n    header = f\"{'六神':<4} {'爻位':<5} {'卦象':<5} {'六亲':<4} {'纳甲':<6} {'标注'}\"\n    out.append(header)\n    out.append(\"-\" * 60)\n\n    # 上爻在上\n    for pos in range(6, 0, -1):\n        ln = board.line(pos)\n        symbol = \"———\" if ln.yin_yang == \"阳\" else \"— —\"\n        tags = ln.label()\n        tag_str = \" \".join(tags) if tags else \"静\"\n        change = \"\"\n        if ln.is_moving and ln.change_zhi:\n            change = f\" → {ln.change_gan}{ln.change_zhi}({ln.change_qin})\"\n        out.append(\n            f\"{ln.shen:<4} {yao_name(pos, ln.yin_yang):<5} {symbol:<5} \"\n            f\"{ln.qin:<4} {ln.gan + ln.zhi + ln.wx:<6} {tag_str}{change}\"\n        )\n\n    out.append(\"-\" * 60)\n    return \"\\n\".join(out)\n","liuyao\\wuxing.py":"\"\"\"五行工具：生克关系、六亲推演、旺衰判定、十二长生、旬空、暗动/日破判定。\"\"\"\n\nfrom .data import (\n    DIZHI, DIZHI_WUXING, WUXING_SHENG, WUXING_KE, WUXING_MU,\n    SHIER_CHANGSHENG_START, SHIER_NAMES, SHIER_STRONG, SHIER_WEAK,\n    TIANGAN, XUNKONG_BY_XUN, CHONG,\n)\n\n\n# ----------------------------------------------------------------\n# 基本关系\n# ----------------------------------------------------------------\ndef sheng_me(wx):\n    \"\"\"生我者的五行（谁生 wx）。\"\"\"\n    for k, v in WUXING_SHENG.items():\n        if v == wx:\n            return k\n    return None\n\n\ndef ke_me(wx):\n    \"\"\"克我者的五行（谁克 wx）。\"\"\"\n    for k, v in WUXING_KE.items():\n        if v == wx:\n            return k\n    return None\n\n\ndef i_sheng(wx):\n    \"\"\"我生者。\"\"\"\n    return WUXING_SHENG[wx]\n\n\ndef i_ke(wx):\n    \"\"\"我克者。\"\"\"\n    return WUXING_KE[wx]\n\n\n# ----------------------------------------------------------------\n# 六亲\n# ----------------------------------------------------------------\ndef liuqin(yao_wx, palace_wx):\n    \"\"\"根据爻五行与本宫五行，返回六亲。\n\n    以本宫五行为'我'：\n        生我者 = 父母；我生者 = 子孙；克我者 = 官鬼；我克者 = 妻财；同我 = 兄弟。\n    \"\"\"\n    if yao_wx == palace_wx:\n        return \"兄弟\"\n    if sheng_me(palace_wx) == yao_wx:   # yao 生 palace → 生我者 = 父母\n        return \"父母\"\n    if i_sheng(palace_wx) == yao_wx:    # palace 生 yao → 我生者 = 子孙\n        return \"子孙\"\n    if ke_me(palace_wx) == yao_wx:      # yao 克 palace → 克我者 = 官鬼\n        return \"官鬼\"\n    if i_ke(palace_wx) == yao_wx:       # palace 克 yao → 我克者 = 妻财\n        return \"妻财\"\n    return \"兄弟\"\n\n\ndef four_gods(yongshen_wx):\n    \"\"\"以用神五行为基准，返回四神的五行。\n\n    用=本身；元=生用者(sheng_me)；忌=克用者(ke_me)；仇=克元者(=生忌者)。\n    例：用=金 → 元=土, 忌=火, 仇=木(克土生火)。\n    \"\"\"\n    yuan = sheng_me(yongshen_wx)\n    ji = ke_me(yongshen_wx)\n    chou = ke_me(yuan)  # 克元神者；亦 = sheng_me(ji) 生忌神者\n    return {\"用\": yongshen_wx, \"元\": yuan, \"忌\": ji, \"仇\": chou}\n\n\ndef yongshen_role(yao_wx, yongshen_wx):\n    \"\"\"该爻(按五行)相对用神爻(按五行)的四神角色：用/元/忌/仇/闲。\n\n    注意：以【用神爻的五行】为基准（非六亲），这才符合\"元生用、忌克用、仇克元生忌\"的定义。\n    \"\"\"\n    if yao_wx == yongshen_wx:\n        return \"用神\"\n    g = four_gods(yongshen_wx)\n    if yao_wx == g[\"元\"]:\n        return \"元神\"\n    if yao_wx == g[\"忌\"]:\n        return \"忌神\"\n    if yao_wx == g[\"仇\"]:\n        return \"仇神\"\n    return \"闲神\"\n\n\n# ----------------------------------------------------------------\n# 真空（旬空 + 当令死地）\n# ----------------------------------------------------------------\n# 真空：春土、夏金、秋木、冬火（《增删卜易·旬空章》）\n_TRUE_VOID = {\n    \"春\": \"土\", \"夏\": \"金\", \"秋\": \"木\", \"冬\": \"火\",\n}\n\n\ndef season_of(month_zhi):\n    \"\"\"月支 → 季节。四季月(辰戌丑未)返回 '季'（土当令，无真空）。\"\"\"\n    if month_zhi in (\"寅\", \"卯\"):\n        return \"春\"\n    if month_zhi in (\"巳\", \"午\"):\n        return \"夏\"\n    if month_zhi in (\"申\", \"酉\"):\n        return \"秋\"\n    if month_zhi in (\"亥\", \"子\"):\n        return \"冬\"\n    return \"季\"  # 辰戌丑未\n\n\ndef is_true_void(yao_wx, month_zhi):\n    \"\"\"爻是否为'真空'：落旬空且其五行恰为当季真空之五行。须配合 is_void 使用。\"\"\"\n    season = season_of(month_zhi)\n    return _TRUE_VOID.get(season) == yao_wx\n\n\n# ----------------------------------------------------------------\n# 旺相休囚死（按月令当令五行）\n# ----------------------------------------------------------------\ndef wuxing_state(yao_wx, ling_wx):\n    \"\"\"爻五行在当令五行(月令)下的状态：旺/相/休/囚/死。\"\"\"\n    if yao_wx == ling_wx:\n        return \"旺\"\n    if sheng_me(ling_wx) == yao_wx:   # 生令者 = 相\n        return \"相\"\n    if i_sheng(ling_wx) == yao_wx:    # 令生者 = 休\n        return \"休\"\n    if ke_me(ling_wx) == yao_wx:      # 克令者 = 囚\n        return \"囚\"\n    if i_ke(ling_wx) == yao_wx:       # 令克者 = 死\n        return \"死\"\n    return \"休\"\n\n\n# ----------------------------------------------------------------\n# 十二长生\n# ----------------------------------------------------------------\ndef shier_changsheng(yao_wx, dz):\n    \"\"\"爻五行(以地支 dz 代表位置)在十二长生中的阶段名。返回阶段名或 None。\"\"\"\n    start = SHIER_CHANGSHENG_START.get(yao_wx)\n    if start is None:\n        return None\n    start_idx = DIZHI.index(start)\n    dz_idx = DIZHI.index(dz)\n    # 地支顺行：(dz_idx - start_idx) % 12 为步数\n    step = (dz_idx - start_idx) % 12\n    return SHIER_NAMES[step]\n\n\n# ----------------------------------------------------------------\n# 爻的旺衰判定（用于暗动/日破、用神有力无力）\n# ----------------------------------------------------------------\ndef is_prosperous(yao_wx, yao_dz, month_dz, day_dz):\n    \"\"\"判断爻是否旺相。\n\n    综合月令旺相休囚死、月日生扶比和、十二长生进气。\n    旺相、得月日生、得月日比和、或处长生/冠带/临官/帝旺 → 视为旺相。\n    \"\"\"\n    month_wx = DIZHI_WUXING[month_dz]\n    day_wx = DIZHI_WUXING[day_dz]\n\n    # 1. 月令旺相\n    st = wuxing_state(yao_wx, month_wx)\n    if st in (\"旺\", \"相\"):\n        return True\n    # 2. 月生日、日生日（生扶）\n    if i_sheng(month_wx) == yao_wx or i_sheng(day_wx) == yao_wx:\n        return True\n    # 3. 月比和、日比和\n    if month_wx == yao_wx or day_wx == yao_wx:\n        return True\n    # 4. 十二长生进气（旺相阶段）\n    stage = shier_changsheng(yao_wx, yao_dz)\n    if stage in SHIER_STRONG:\n        return True\n    return False\n\n\n# ----------------------------------------------------------------\n# 旬空\n# ----------------------------------------------------------------\ndef ganzhi_index(gan, zhi):\n    \"\"\"六十甲子序号 0..59。\"\"\"\n    gi = TIANGAN.index(gan)\n    zi = DIZHI.index(zhi)\n    n = gi\n    while n % 12 != zi:\n        n += 10\n    return n  # 必在 0..59\n\n\ndef xunkong(day_gz):\n    \"\"\"由日干支(如 '辛卯')查旬空，返回两个空亡地支的元组。\"\"\"\n    g, z = day_gz[0], day_gz[1]\n    n = ganzhi_index(g, z)\n    return XUNKONG_BY_XUN[n // 10]\n\n\ndef is_void(yao_dz, day_gz):\n    \"\"\"爻地支是否落空亡。\"\"\"\n    return yao_dz in xunkong(day_gz)\n\n\n# ----------------------------------------------------------------\n# 冲\n# ----------------------------------------------------------------\ndef is_chong(a, b):\n    return CHONG.get(a) == b\n","liuyao\\__init__.py":"\"\"\"六爻排盘引擎。\n\n快速使用：\n    from liuyao import cast_board\n    board = cast_board(\"地泽临\", moving=2, month_zhi=\"未\", day_gz=\"辛卯\", yongshen_qin=\"妻财\")\n    print(board.line(2).jin_tui)   # \"化退神\"\n\"\"\"\n\nfrom .board import cast_board, Board, Line\nfrom .data import find_hexagram, HEXAGRAMS\nfrom .wuxing import xunkong, liuqin, wuxing_state, is_prosperous\nfrom .format import format_board\n\n__all__ = [\n    \"cast_board\", \"Board\", \"Line\",\n    \"find_hexagram\", \"HEXAGRAMS\",\n    \"xunkong\", \"liuqin\", \"wuxing_state\", \"is_prosperous\",\n    \"format_board\",\n]\n\n__version__ = \"0.1.0\"\n"}
-</script>
-
-<!-- 内联资源：AI 规则索引 + GitHub Raw 链接 -->
-<script type="application/json" id="ai-rules-index">
-[{"step":1,"title":"排盘定盘","file":"01-%E8%A3%85%E5%8D%A6%E6%8E%92%E7%9B%98.md"},{"step":2,"title":"取用神","file":"02-%E5%8F%96%E7%94%A8%E7%A5%9E.md"},{"step":3,"title":"用神旺衰（月令/日令/十二长生）","file":"03-%E6%97%BA%E8%A1%9C%E6%9C%88%E6%97%A5.md"},{"step":4,"title":"世爻状态","file":"04-%E5%8A%A8%E9%9D%99%E6%9A%97%E7%A0%B4.md"},{"step":5,"title":"查动静、暗动、月破、日破","file":"04-%E5%8A%A8%E9%9D%99%E6%9A%97%E7%A0%B4.md"},{"step":6,"title":"查化变（进退神化）","file":"05-%E8%BF%9B%E9%80%80%E7%A5%9E%E5%8C%96.md"},{"step":6,"title":"查合冲刑害","file":"06-%E5%90%88%E5%86%B2%E5%88%91%E5%AE%B3.md"},{"step":7,"title":"查墓库、空亡","file":"07-%E5%A2%93%E5%BA%93%E7%A9%BA%E4%BA%A1.md"},{"step":8,"title":"综合定性、定应期","file":"08-%E6%96%AD%E5%8D%A6%E5%BA%94%E6%9C%9F%E6%B5%81%E7%A8%8B.md"},{"step":9,"title":"推算节气/大小月/小日","file":"09-%E6%9C%AD%E7%AE%97%E9%92%88%E7%AE%97%E5%A4%A7%E5%B0%8F%E6%9C%88%E5%B0%8F%E6%97%A5.md"},{"step":10,"title":"发动墓库与空亡","file":"10-%E5%8F%91%E5%8A%A8%E5%A2%93%E5%BA%93%E5%92%8C%E7%A9%BA%E4%BA%A1.md"},{"step":11,"title":"实战案例参考","file":"11-%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E6%96%87%E6%9C%AC.md"}]
-</script>
-
-<!-- 内联资源：64 卦列表 -->
-<script type="application/json" id="hexagram-list">
-[{"idx":1,"name":"乾为天","alias":"乾","upper":"乾","lower":"乾","palace":"乾","palace_wx":"金","world":6},{"idx":2,"name":"天风姤","alias":"姤","upper":"乾","lower":"巽","palace":"乾","palace_wx":"金","world":1},{"idx":3,"name":"天山遁","alias":"遁","upper":"乾","lower":"艮","palace":"乾","palace_wx":"金","world":2},{"idx":4,"name":"天地否","alias":"否","upper":"乾","lower":"坤","palace":"乾","palace_wx":"金","world":3},{"idx":5,"name":"风地观","alias":"观","upper":"巽","lower":"坤","palace":"乾","palace_wx":"金","world":4},{"idx":6,"name":"山地剥","alias":"剥","upper":"艮","lower":"坤","palace":"乾","palace_wx":"金","world":5},{"idx":7,"name":"火地晋","alias":"晋","upper":"离","lower":"坤","palace":"乾","palace_wx":"金","world":4},{"idx":8,"name":"火天大有","alias":"大有","upper":"离","lower":"乾","palace":"乾","palace_wx":"金","world":3},{"idx":9,"name":"兑为泽","alias":"兑","upper":"兑","lower":"兑","palace":"兑","palace_wx":"金","world":6},{"idx":10,"name":"泽水困","alias":"困","upper":"兑","lower":"坎","palace":"兑","palace_wx":"金","world":1},{"idx":11,"name":"泽地萃","alias":"萃","upper":"兑","lower":"坤","palace":"兑","palace_wx":"金","world":2},{"idx":12,"name":"泽山咸","alias":"咸","upper":"兑","lower":"艮","palace":"兑","palace_wx":"金","world":3},{"idx":13,"name":"水山蹇","alias":"蹇","upper":"坎","lower":"艮","palace":"兑","palace_wx":"金","world":4},{"idx":14,"name":"地山谦","alias":"谦","upper":"坤","lower":"艮","palace":"兑","palace_wx":"金","world":5},{"idx":15,"name":"雷山小过","alias":"小过","upper":"震","lower":"艮","palace":"兑","palace_wx":"金","world":4},{"idx":16,"name":"雷泽归妹","alias":"归妹","upper":"震","lower":"兑","palace":"兑","palace_wx":"金","world":3},{"idx":17,"name":"离为火","alias":"离","upper":"离","lower":"离","palace":"离","palace_wx":"火","world":6},{"idx":18,"name":"火山旅","alias":"旅","upper":"离","lower":"艮","palace":"离","palace_wx":"火","world":1},{"idx":19,"name":"火风鼎","alias":"鼎","upper":"离","lower":"巽","palace":"离","palace_wx":"火","world":2},{"idx":20,"name":"火水未济","alias":"未济","upper":"离","lower":"坎","palace":"离","palace_wx":"火","world":3},{"idx":21,"name":"山水蒙","alias":"蒙","upper":"艮","lower":"坎","palace":"离","palace_wx":"火","world":4},{"idx":22,"name":"风水涣","alias":"涣","upper":"巽","lower":"坎","palace":"离","palace_wx":"火","world":5},{"idx":23,"name":"天水讼","alias":"讼","upper":"乾","lower":"坎","palace":"离","palace_wx":"火","world":4},{"idx":24,"name":"天火同人","alias":"同人","upper":"乾","lower":"离","palace":"离","palace_wx":"火","world":3},{"idx":25,"name":"震为雷","alias":"震","upper":"震","lower":"震","palace":"震","palace_wx":"木","world":6},{"idx":26,"name":"雷地豫","alias":"豫","upper":"震","lower":"坤","palace":"震","palace_wx":"木","world":1},{"idx":27,"name":"雷水解","alias":"解","upper":"震","lower":"坎","palace":"震","palace_wx":"木","world":2},{"idx":28,"name":"雷风恒","alias":"恒","upper":"震","lower":"巽","palace":"震","palace_wx":"木","world":3},{"idx":29,"name":"地风升","alias":"升","upper":"坤","lower":"巽","palace":"震","palace_wx":"木","world":4},{"idx":30,"name":"水风井","alias":"井","upper":"坎","lower":"巽","palace":"震","palace_wx":"木","world":5},{"idx":31,"name":"泽风大过","alias":"大过","upper":"兑","lower":"巽","palace":"震","palace_wx":"木","world":4},{"idx":32,"name":"泽雷随","alias":"随","upper":"兑","lower":"震","palace":"震","palace_wx":"木","world":3},{"idx":33,"name":"巽为风","alias":"巽","upper":"巽","lower":"巽","palace":"巽","palace_wx":"木","world":6},{"idx":34,"name":"风天小畜","alias":"小畜","upper":"巽","lower":"乾","palace":"巽","palace_wx":"木","world":1},{"idx":35,"name":"风火家人","alias":"家人","upper":"巽","lower":"离","palace":"巽","palace_wx":"木","world":2},{"idx":36,"name":"风雷益","alias":"益","upper":"巽","lower":"震","palace":"巽","palace_wx":"木","world":3},{"idx":37,"name":"天雷无妄","alias":"无妄","upper":"乾","lower":"震","palace":"巽","palace_wx":"木","world":4},{"idx":38,"name":"火雷噬嗑","alias":"噬嗑","upper":"离","lower":"震","palace":"巽","palace_wx":"木","world":5},{"idx":39,"name":"山雷颐","alias":"颐","upper":"艮","lower":"震","palace":"巽","palace_wx":"木","world":4},{"idx":40,"name":"山风蛊","alias":"蛊","upper":"艮","lower":"巽","palace":"巽","palace_wx":"木","world":3},{"idx":41,"name":"坎为水","alias":"坎","upper":"坎","lower":"坎","palace":"坎","palace_wx":"水","world":6},{"idx":42,"name":"水泽节","alias":"节","upper":"坎","lower":"兑","palace":"坎","palace_wx":"水","world":1},{"idx":43,"name":"水雷屯","alias":"屯","upper":"坎","lower":"震","palace":"坎","palace_wx":"水","world":2},{"idx":44,"name":"水火既济","alias":"既济","upper":"坎","lower":"离","palace":"坎","palace_wx":"水","world":3},{"idx":45,"name":"泽火革","alias":"革","upper":"兑","lower":"离","palace":"坎","palace_wx":"水","world":4},{"idx":46,"name":"雷火丰","alias":"丰","upper":"震","lower":"离","palace":"坎","palace_wx":"水","world":5},{"idx":47,"name":"地火明夷","alias":"明夷","upper":"坤","lower":"离","palace":"坎","palace_wx":"水","world":4},{"idx":48,"name":"地水师","alias":"师","upper":"坤","lower":"坎","palace":"坎","palace_wx":"水","world":3},{"idx":49,"name":"艮为山","alias":"艮","upper":"艮","lower":"艮","palace":"艮","palace_wx":"土","world":6},{"idx":50,"name":"山火贲","alias":"贲","upper":"艮","lower":"离","palace":"艮","palace_wx":"土","world":1},{"idx":51,"name":"山天大畜","alias":"大畜","upper":"艮","lower":"乾","palace":"艮","palace_wx":"土","world":2},{"idx":52,"name":"山泽损","alias":"损","upper":"艮","lower":"兑","palace":"艮","palace_wx":"土","world":3},{"idx":53,"name":"火泽睽","alias":"睽","upper":"离","lower":"兑","palace":"艮","palace_wx":"土","world":4},{"idx":54,"name":"天泽履","alias":"履","upper":"乾","lower":"兑","palace":"艮","palace_wx":"土","world":5},{"idx":55,"name":"风泽中孚","alias":"中孚","upper":"巽","lower":"兑","palace":"艮","palace_wx":"土","world":4},{"idx":56,"name":"风山渐","alias":"渐","upper":"巽","lower":"艮","palace":"艮","palace_wx":"土","world":3},{"idx":57,"name":"坤为地","alias":"坤","upper":"坤","lower":"坤","palace":"坤","palace_wx":"土","world":6},{"idx":58,"name":"地雷复","alias":"复","upper":"坤","lower":"震","palace":"坤","palace_wx":"土","world":1},{"idx":59,"name":"地泽临","alias":"临","upper":"坤","lower":"兑","palace":"坤","palace_wx":"土","world":2},{"idx":60,"name":"地天泰","alias":"泰","upper":"坤","lower":"乾","palace":"坤","palace_wx":"土","world":3},{"idx":61,"name":"雷天大壮","alias":"大壮","upper":"震","lower":"乾","palace":"坤","palace_wx":"土","world":4},{"idx":62,"name":"泽天夬","alias":"夬","upper":"兑","lower":"乾","palace":"坤","palace_wx":"土","world":5},{"idx":63,"name":"水天需","alias":"需","upper":"坎","lower":"乾","palace":"坤","palace_wx":"土","world":4},{"idx":64,"name":"水地比","alias":"比","upper":"坎","lower":"坤","palace":"坤","palace_wx":"土","world":3}]
-</script>
-
-<!-- Pyodide -->
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
-<!-- Local lunar-javascript bundle -->
-<script src="lunar-bundle.js"></script>
-<script>
-  console.log("[DEBUG] Lunar loaded from local bundle:", Object.keys(window.Lunar).slice(0,5));
-</script>
-<script>
-  function waitForLunar() {
-    return new Promise(resolve => {
-      if (window.Lunar) {
-        console.log("[DEBUG] Lunar already available");
-        return resolve();
-      }
-      const timer = setInterval(() => {
-        if (window.Lunar) {
-          clearInterval(timer);
-          console.log("[DEBUG] Lunar ready");
-          resolve();
-        }
-      }, 50);
-      setTimeout(() => { 
-        clearInterval(timer); 
-        console.error("[DEBUG] Lunar load timeout"); 
-        resolve(); 
-      }, 2000);
-    });
-  }
-</script>
-
-<script>
-/* ===== DOM 引用 ===== */
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
-
-// GitHub raw 文档基础 URL
-const GITHUB_BASE = 'https://raw.githubusercontent.com/wenaryHY/liuyao-divination/main/references/';
-
-// 历史记录数组
-let history = [];
-
-/* ===== 初始化下拉选项 ===== */
-async function initSelects() {
-  await waitForLunar();
-  console.log("[DEBUG] initSelects after waitForLunar, Lunar:", !!window.Lunar);
-  // 64 卦
-  const hexList = JSON.parse(document.getElementById('hexagram-list').textContent);
-  const hexSel = $('#hexagram');
-  hexList.forEach(h => {
-    const opt = document.createElement('option');
-    opt.value = h.name;
-    opt.textContent = h.idx + '. ' + h.name + ' (' + h.upper + h.lower + ')';
-    hexSel.appendChild(opt);
-  });
-
-  // 月建
-  const zhi = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
-  const mzSel = $('#month-zhi');
-  zhi.forEach(z => {
-    const opt = document.createElement('option');
-    opt.value = z; opt.textContent = z;
-    mzSel.appendChild(opt);
-  });
-
-  // 默认当前时间填充月建/日干支
-  const fillCurrentTime = () => {
-    console.log("[DEBUG] fillCurrentTime called");
-    const Lunar = window.Lunar.Lunar;
-    if (!Lunar) {
-      console.debug("[DEBUG] Lunar not ready");
-      return false;
-    }
-    try {
-      const now = new Date();
-      const lunar = Lunar.fromDate(now);
-      console.log("[DEBUG] Lunar.fromDate ok, lunar:", !!lunar);
-      const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
-      let dayGz = "";
-      // Get day Gan and Zhi separately and combine
-      const dayGan = typeof lunar.getDayGan === 'function' ? lunar.getDayGan() : "";
-      const dayZhi = typeof lunar.getDayZhi === 'function' ? lunar.getDayZhi() : "";
-      console.log("[DEBUG] Day Gan:", dayGan, "Day Zhi:", dayZhi);
-      dayGz = dayGan + dayZhi;
-      console.log("[DEBUG] Raw dayGz:", dayGz);
-      console.log("[DEBUG] Month zhi:", monthZhi, "Day gz:", dayGz);
-      if (monthZhi) mzSel.value = monthZhi;
-      if (dayGz && dayGz.length === 2) {
-        document.getElementById("day-gz").value = dayGz;
-        console.log("[DEBUG] Auto-filled successfully:", monthZhi, dayGz);
-        return true;
-      } else {
-        console.warn("[DEBUG] Invalid dayGz:", dayGz);
-        return false;
-      }
-    } catch (e) {
-      console.error("[DEBUG] fillCurrentTime error:", e);
-      return false;
-    }
-  };
-  // 此时 Lunar 已就绪，直接填充
-  if (!fillCurrentTime()) {
-    // 兜底
-    if (!$('#day-gz').value) {
-      $('#day-gz').value = '甲子';
-      console.warn('Fallback to default day-gz: 甲子');
-    }
-  }
-
-  // 用神
-  const qin = ["父母","兄弟","子孙","妻财","官鬼"];
-  const ysSel = $('#yongshen');
-  qin.forEach(q => { const o=document.createElement('option');o.value=q;o.textContent=q;ysSel.appendChild(o); });
-}
-
-/* ===== 面板切换 ===== */
-$('#method').addEventListener('change', e => {
-  ['manual','random','time'].forEach(m => {
-    const el = document.getElementById(`panel-${m}`);
-    el.hidden = (m !== e.target.value);
-  });
-});
-
-$('#use-current-time').addEventListener('change', e => {
-  $('#custom-time-field').hidden = e.target.checked;
-});
-
-/* ===== Pyodide 初始化 ===== */
-async function initPyodide() {
-  console.log("[DEBUG] initPyodide started");
-  const status = document.getElementById("status");
-  status.textContent = "Loading Python runtime...";
-  status.className = "status";
-
-  const progressBar = document.createElement("div");
-  progressBar.id = "pyodide-progress";
-  progressBar.innerHTML = "<div></div>";
-  status.parentNode.insertBefore(progressBar, status.nextSibling);
-
-  try {
-    console.log("[DEBUG] Loading Pyodide...");
-    pyodide = await loadPyodide({
-      indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-      stdout: (msg) => { if(msg.includes("%")) updateProgress(msg); },
-      stderr: (msg) => console.warn("[Pyodide stderr]", msg)
-    });
-    console.log("[DEBUG] Pyodide loaded");
-
-    // Use Python to create directory tree (bypasses FS.mkdir limitations)
-    console.log("[DEBUG] Creating directory tree via Python...");
-    const pythonMkdir = "import os\nos.makedirs(\"/home/pyodide/liuyao_pkg/liuyao\", exist_ok=True)\nprint(\"Python: directories created\")";
-    await pyodide.runPython(pythonMkdir);
-    console.log("[DEBUG] Directories created");
-
-    // Write liuyao package to virtual FS
-    console.log("[DEBUG] Writing package files...");
-    const pkg = JSON.parse(document.getElementById("liuyao-pkg").textContent);
-    for (const [relPath, content] of Object.entries(pkg)) {
-      const fullPath = "/home/pyodide/liuyao_pkg/" + relPath.replace(/\\/g, "/");
-      try {
-        await pyodide.FS.writeFile(fullPath, content, { encoding: "utf8" });
-      } catch (e) {
-        console.error("[DEBUG] writeFile failed:", relPath, e.message);
-        throw e;
-      }
-    }
-    console.log("[DEBUG] Package files written");
-
-    // Import and expose cast_board
-    console.log("[DEBUG] Importing liuyao module...");
-    const pythonImport = "import sys\nsys.path.insert(0, \"/home/pyodide/liuyao_pkg\")\nfrom liuyao import cast_board, format_board\ndef _cast(args):\n    board = cast_board(args[\"hexagram\"], args[\"moving\"], args[\"month_zhi\"], args[\"day_gz\"], args.get(\"yongshen_qin\"))\n    return format_board(board)\nprint(\"Python: liuyao imported\")";
-    await pyodide.runPython(pythonImport);
-    console.log("[DEBUG] liuyao module imported");
-
-    castBoard = (args) => pyodide.runPython("_cast(" + JSON.stringify(args).replace(/null/g, "None") + ")");
-
-    status.textContent = "Ready";
-    status.className = "status ok";
-    progressBar.remove();
-    document.getElementById("btn-cast").disabled = false;
-    console.log("[DEBUG] initPyodide completed successfully");
-  } catch (err) {
-    console.error("[DEBUG] initPyodide error:", err);
-    status.textContent = "Init failed: " + err.message;
-    status.className = "status err";
-  }
-}
-
-function updateProgress(msg) {
-  const m = msg.match(/(\d+)%/);
-  if (m) {
-    const bar = document.querySelector("#pyodide-progress > div");
-    if (bar) bar.style.width = m[1] + "%";
-  }
-}
-
-
-
-/* ===== 起卦核心逻辑 ===== */
-function getFormArgs() {
-  const method = $('#method').value;
-  const month_zhi = $('#month-zhi').value;
-  const day_gz = $('#day-gz').value.trim();
-  const yongshen_qin = $('#yongshen').value || null;
-
-  if (!day_gz || day_gz.length !== 2) {
-    throw new Error('日干支格式错误，需两字（如 辛卯）');
-  }
-
-  let hexagram, moving;
-
-  if (method === 'manual') {
-    hexagram = $('#hexagram').value;
-    const mv = $('#moving').value.trim();
-    moving = mv.split(',').map(s=>parseInt(s.trim())).filter(n=>n>=1&&n<=6);
-    if (!moving.length) throw new Error('动爻不能为空');
-  } else if (method === 'random') {
-    // 模拟三钱六掷：每爻 6/7/8/9
-    const lines = Array.from({length:6}, () => [6,7,8,9][Math.floor(Math.random()*4)]);
-    // 6=老阴(动) 7=少阳(静) 8=少阴(静) 9=老阳(动)
-    moving = lines.map((v,i)=> (v===6||v===9)?i+1:null).filter(x=>x);
-    // 推算主卦
-    const yao = lines.map(v => (v===7||v===9)?1:0); // 阳=1 阴=0
-    const lower = yao.slice(0,3), upper = yao.slice(3,6);
-    const baguaMap = {
-      '1,1,1':'乾','1,1,0':'兑','1,0,1':'离','1,0,0':'震',
-      '0,1,1':'巽','0,1,0':'坎','0,0,1':'艮','0,0,0':'坤'
-    };
-    const lowerName = baguaMap[lower.join(',')];
-    const upperName = baguaMap[upper.join(',')];
-    // 查找卦名
-    const hexList = JSON.parse(document.getElementById('hexagram-list').textContent);
-    const rec = hexList.find(h => h.upper===upperName && h.lower===lowerName);
-    hexagram = rec ? rec.name : '乾为天';
-  } else if (method === 'time') {
-    // 时间起卦：纳甲八卦数
-    const useCurrent = $('#use-current-time').checked;
-    let dt = useCurrent ? new Date() : new Date($('#custom-time').value);
-    if (isNaN(dt.getTime())) throw new Error('时间无效');
-
-    const lunar = window.Lunar.Lunar.fromDate(dt);
-    const hourZhi = lunar.getTimeZhi(); // 时辰地支
-    const dayZhi = lunar.getDayZhi();   // 日支
-
-    const zhiToNum = {"子":1,"丑":2,"寅":3,"卯":4,"辰":5,"巳":6,"午":7,"未":8,"申":9,"酉":10,"戌":11,"亥":12};
-    const numToGua = {1:"乾",2:"兑",3:"离",4:"震",5:"巽",6:"坎",7:"艮",8:"坤"};
-
-    const upperNum = zhiToNum[hourZhi];
-    const lowerNum = zhiToNum[dayZhi];
-    const movingNum = ((upperNum + lowerNum - 1) % 6) + 1;
-
-    const upperGua = numToGua[upperNum > 8 ? upperNum - 8 : upperNum];
-    const lowerGua = numToGua[lowerNum > 8 ? lowerNum - 8 : lowerNum];
-
-    const hexList = JSON.parse(document.getElementById('hexagram-list').textContent);
-    const rec = hexList.find(h => h.upper===upperGua && h.lower===lowerGua);
-    hexagram = rec ? rec.name : '乾为天';
-    moving = [movingNum];
-
-    // 自动填充月建/日干支
-    $('#month-zhi').value = lunar.getMonthZhi();
-    $('#day-gz').value = lunar.getDayGan() + lunar.getDayZhi();
-  }
-
-  return { hexagram, moving, month_zhi, day_gz, yongshen_qin };
-}
-
-async function doCast() {
-  const btn = $('#btn-cast');
-  const status = $('#status');
-  btn.disabled = true;
-  status.textContent = '排盘中...';
-  status.className = 'status';
-
-  try {
-    const args = getFormArgs();
-    const boardText = await castBoard(args);
-
-    // 渲染卦盘
-    $('#board-output').textContent = boardText;
-
-    // 生成 AI 文本
-    const aiText = buildAIText(args, boardText);
-    $('#ai-output').textContent = aiText;
-
-    // 启用复制按钮
-    $('#btn-copy-board').disabled = false;
-    $('#btn-copy-ai').disabled = false;
-
-    // 保存历史
-    saveHistory(args, boardText, aiText);
-
-    status.textContent = '完成';
-    status.className = 'status ok';
-  } catch (err) {
-    status.textContent = '错误: ' + err.message;
-    status.className = 'status err';
-    console.error(err);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-/* ===== 构建 AI 解卦文本 ===== */
-function buildAIText(args, boardText) {
-  const now = new Date();
-  const lunar = window.Lunar.Lunar.fromDate(now);
-  const rulesIndex = JSON.parse(document.getElementById('ai-rules-index').textContent);
-
-  let md = [];
-  md.push('# 六爻排盘 - AI 解卦参考');
-  md.push('');
-  md.push('## 基础信息');
-  md.push(`- 起卦方式：${methodLabel(args)}`);
-  md.push(`- 公历：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
-  if (lunar) md.push(`- 农历：${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()} ${lunar.getTimeZhi()}时`);
-  md.push(`- 月建：${args.month_zhi} / 日干支：${args.day_gz}`);
-  md.push('');
-  md.push('## 卦盘原文');
-  md.push('```');
-  md.push(boardText);
-  md.push('```');
-  md.push('');
-  md.push('## 断卦流程目录（请逐条访问链接获取详细规则）');
-  rulesIndex.forEach(r => {
-    md.push(`### ${r.step}. ${r.title}`);
-    md.push(`- 文档：${GITHUB_BASE}${r.file}`);
-    md.push('');
-  });
-  md.push('---');
-  md.push('**重要提示**：以上规则仅为目录索引，具体断卦细则必须逐条访问上述 GitHub Raw 链接查阅完整文档。未联网查阅视为断卦失败。');
-  md.push('');
-  md.push('## 卦例参考');
-  md.push(`- 实战案例：${GITHUB_BASE}11-%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E6%96%87%E6%9C%AC.md`);
-  return md.join('\n');
-}
-
-function methodLabel(args) {
-  const m = $('#method').value;
-  return {'manual':'手动摆卦','random':'模拟摇卦','time':'时间起卦(辅助)'}[m];
-}
-
-/* ===== 历史记录 ===== */
-function loadHistory() {
-  try {
-    const saved = localStorage.getItem('liuyao_history');
-    if (saved) {
-      history = JSON.parse(saved);
-    } else {
-      history = [];
-    }
-  } catch {
-    history = [];
-  }
-}
-
-function saveHistory(args, boardText, aiText) {
-  const entry = {
-    time: new Date().toISOString(),
-    args,
-    board: boardText,
-    ai: aiText
-  };
-  history.unshift(entry);
-  if (history.length > 100) history.pop();
-  localStorage.setItem('liuyao_history', JSON.stringify(history));
-}
-
-function exportHistory() {
-  const jsonl = history.map(e => JSON.stringify(e)).join('\n');
-  const blob = new Blob([jsonl], {type: 'application/jsonl'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `liuyao-history-${Date.now()}.jsonl`;
-  a.click(); URL.revokeObjectURL(url);
-}
-
-function importHistory(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const text = e.target.result;
-      const lines = text.trim().split('\n').filter(l=>l);
-      const imported = lines.map(l => JSON.parse(l));
-      history = [...imported, ...history].slice(0, 100);
-      localStorage.setItem('liuyao_history', JSON.stringify(history));
-      alert(`导入 ${imported.length} 条记录`);
-    } catch (err) { alert('导入失败: ' + err.message); }
-  };
-  reader.readAsText(file);
-}
-
-/* ===== 复制功能 ===== */
-async function copyText(text, label) {
-  try {
-    await navigator.clipboard.writeText(text);
-    alert(`${label} 已复制到剪贴板`);
-  } catch {
-    // 降级
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy');
-    ta.remove();
-    alert(`${label} 已复制 (降级)`);
-  }
-}
-
-/* ===== 事件绑定 ===== */
-$('#btn-cast').addEventListener('click', doCast);
-$('#btn-clear').addEventListener('click', () => {
-  $('#board-output').textContent = '等待起卦...';
-  $('#ai-output').textContent = '等待起卦...';
-  $('#btn-copy-board').disabled = true;
-  $('#btn-copy-ai').disabled = true;
-  $('#status').textContent = '';
-});
-$('#btn-copy-board').addEventListener('click', () => copyText($('#board-output').textContent, '卦盘信息'));
-$('#btn-copy-ai').addEventListener('click', () => copyText($('#ai-output').textContent, 'AI 解卦文本'));
-$('#btn-export-history').addEventListener('click', exportHistory);
-$('#btn-import-history').addEventListener('click', () => $('#import-file').click());
-$('#import-file').addEventListener('change', e => { if(e.target.files[0]) importHistory(e.target.files[0]); });
-
-/* ===== 启动 ===== */
-document.addEventListener('DOMContentLoaded', () => {
-  initSelects();
-  loadHistory();
-  initPyodide();
-});
-
-// 注册 Service Worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(console.warn);
-}
-</script>
-</body>
-</html>
+# 11 · 六十四卦判辞（卦象与断辞速查）
+
+（共 64 卦，按八宫分组。）
+断卦时，主卦、变卦的**卦意**可参此表——每卦列「一句话卦象」与「判曰（传统断辞歌诀）」，用于快速把握卦的总体意象与吉凶倾向。
+
+> 提炼自《易经六十四卦》整理稿（判辞为传统断卦歌诀）。**六爻纳甲断法以用神旺衰生克为本，卦辞判辞为意象参考**，二者互为参证，不可只凭卦辞判辞定吉凶。
+
+> 注：各卦注记（纯卦／一世／…、六冲／六合）沿用源稿，偶有笔误；**世爻位置与六冲六合一律以引擎排盘（`paipan.py`）为准**。
+
+## 乾宫八卦——属金
+
+### 乾为天
+> （纯卦）乾上 乾下（六冲）
+
+- **卦象**：六龙御天之卦，广大包容之象。
+- **判曰**：乾者，健也。大哉乾元。荫覆无偏，玄运造化，万物资始。云行雨施。变化不言。东西任意，南北安然。
+
+### 天风姤
+> （一世）乾上 巽下
+
+- **卦象**：风云相济之卦，君臣会合之象。
+- **判曰**：姤者，遇也。以阴遇阳，以柔遇刚，本无所望，而卒然值之，不期而遇。占者得之，所谋无不吉也。
+
+### 天山遁
+> （二世）乾上 艮下
+
+- **卦象**：豹隐南山之卦，近善远恶之象。
+- **判曰**：遁者，退也。处遁之时，阳道欲亏，恶事即起，善事欲衰。欲进欲退，疑惑难为，以小制大，君子避之。
+
+### 天地否
+> （三合）乾上 坤下（ 六合）
+
+- **卦象**：天地不交之卦，人口不圆之象。
+- **判曰**：否者，塞也。天地不交，阴阳闭塞。夫妇不和，别离南北。君子道消，小人道长。人物乖违，不通之象。
+
+### 风地观
+> （四世）巽上 坤下
+
+- **卦象**：云卷晴空之卦，春花竞发之象。
+- **判曰**：观者，观也。观国之光，风在地上，万物荣昌。财不破散，爵禄加彰。
+
+### 山地剥
+> （五世）艮上 坤下
+
+- **卦象**：去旧生新之卦，群阴剥尽之象。
+- **判曰**：剥者，落也。山高岌岌，其形似剥。阴道将盈，阳道衰弱。卦临九月，霜叶凋落。人离财散，求官失爵。
+
+### 火地晋
+> （游魂）离上 坤下
+
+- **卦象**：龙剑出匣之卦，以臣遇君之象。
+- **判曰**：晋者，进也。日出于地，柔而上行，巡运照耀，升进其明。居官益位，祸灭福生，利见王侯，任意必亨。
+
+### 火天大有
+> （归魂）离上 乾下
+
+- **卦象**：金玉满堂之卦，大明中天之象。
+- **判曰**：大有者，宽也。柔得尊位，官禄日实。掩恶扬善，丰财和义，广纳包容，成物之美。自天佑之，吉无不利。
+
+## 兑宫八卦——属金
+
+### 兑为泽
+> （纯卦）兑上 兑下（六冲）
+
+- **卦象**：江湖养物之卦，天降雨泽之象。
+- **判曰**：兑者，悦也。泽润万物，恩惠兆民。居上爱下，悦而忻忻。利有攸往，无不亨贞。
+
+### 泽水困
+> （一世）兑上 坎下（六合）
+
+- **卦象**：河中无水之卦，守己待时之象。
+- **判曰**：困者，危也。水在泽下，万物不生。君子困穷，小人滥盈。三山幽谷，向暗背明。占者有难，守而勿争。
+
+### 泽地萃
+> （二世）兑上 坤下
+
+- **卦象**：鱼龙会聚之卦，如水就下之象。
+- **判曰**：萃者，聚也。内外喜悦，上下俱柔。万事蕃息，利禄悠悠。求谋有济，解释忧愁。
+
+### 泽山咸
+> （三世）兑上 艮下
+
+- **卦象**：
+- **判曰**：
+
+### 水山蹇
+> （四世）坎上 艮下
+
+- **卦象**：飞雁衔芦之卦，背明向暗之象。
+- **判曰**：蹇者，难也。利往西南，不利东北。向暗背明，多有壅塞。求事未遂，尚多疑惑。
+
+### 地山谦
+> （五世）坤上 艮下
+
+- **卦象**：地中有山之卦，仰高就下之象。
+- **判曰**：谦者，退也。谦而受益，满而受亏。谦谦君子，尊人自卑。利用谦逊，万事无违。
+
+### 雷山小过
+> （ 游魂）震上 艮下
+
+- **卦象**：
+- **判曰**：
+
+### 雷泽归妹
+> （ 归魂）震上 兑下
+
+- **卦象**：浮云蔽日之卦，阴阳不交之象。
+- **判曰**：归妹者，大也。归妹未吉，其道将穷。天地不交，闭塞不通。有殃有咎，无始无终。所作不顺。必见其凶。
+
+## 离宫八卦——属火
+
+### 离为火
+> （纯卦）离上 离下（六冲）
+
+- **卦象**：飞禽遇网之卦，大明当天之象。
+- **判曰**：离者，丽也。光明美丽，不利出师。二鸟同飞，雄失其雌，婚姻未合，易起官非。口舌相尚，财散人离。
+
+### 火山旅
+> （一世）离上 艮下
+
+- **卦象**：如鸟焚巢之卦，乐极哀生之象。
+- **判曰**：旅者，客也。长途落落，羁旅凄凄，火行山上，逐草高低。如鸟焚巢，无枝可栖。虽然先笑，后有悲啼。
+
+### 火风鼎
+> （二世）离上 巽下
+
+- **卦象**：调和鼎鼐之卦，去旧取新之象。
+- **判曰**：鼎者，定也。鼎象九州，和羹之器，变生为熟，以成香味。鼎乃易溢，不宜争事，官鬼持世，求官最利。
+
+### 火水未济
+> （三世）离上 坎下
+
+- **卦象**：竭海求珠之卦，忧中望喜之象。
+- **判曰**：未济者，失也。水火不交，刚柔失位，求事未成，多有壅滞。如狐渡水，必濡其尾。积小成大，谓之未济。
+
+### 山水蒙
+> （四世）艮上 坎下
+
+- **卦象**：人藏烟草之卦，万物始生之象。
+- **判曰**：蒙者，昧也。蒙以养正，山下有泉，回还反覆，迷闷相连。多忧过失，病患相缠，欲进欲追，疑惑不前。
+
+### 风水涣
+> （五世）巽上 坎下
+
+- **卦象**：顺水行舟之卦，大风吹物之象。
+- **判曰**：涣者，散也。逐波随水，患难将消，恶事离身，狱讼出牢。利涉大川，舟楫遥遥，出入无滞，福德滔滔。
+
+### 天水讼
+> （游魂）乾上 坎下
+
+- **卦象**：纵鹰逐兔之卦，天水相违之象。
+- **判曰**：讼者，论也。天道西往，水脉东流。求事未遂，心常怀忧。争讼宜止，可用和休。
+
+### 天火同人
+> （归魂）乾上 离下
+
+- **卦象**：游鱼从水之卦，管鲍分金之象。
+- **判曰**：同人者，亲也。同心之言，其臭如兰。二人同心，其利断金。所求皆得，无不称心。
+
+## 震宫八卦——属木
+
+### 震为雷
+> （纯卦）震上 震下（六冲）
+
+- **卦象**：震惊百里之卦，有声无形之象。
+- **判曰**：震者，动也。重雷发响，百里飞声，无事之者，愕然而惊。求谋和遂，官爵难成。空闻其响，不见其形。
+
+### 雷地豫
+> （一世）震上 坤下（六合）
+
+- **卦象**：鸾凤生雏之卦，万物发荣之象。
+- **判曰**：豫者，悦也。雷出于地，开鼓翼，天地顺动。日时不忒。先王制礼，殷荐崇德。凡事无疑，上下悦怿。
+
+### 雷水解
+> （二世）震上 坎下
+
+- **卦象**：春雷行雨之卦，忧散喜生之象。
+- **判曰**：解者，散也。出于险难，恶事消散，狱讼可释，共相歌赞。婚不和谐，人如隔面。久患在床，今当冰泮。
+
+### 雷风恒
+> （三世）震上 巽下
+
+- **卦象**：日月长明之卦，四时不忒之象。
+- **判曰**：恒者，久也。长久安静，不动为良，四时变化，天道无常。日月运转，普照其光。君子以立，不易其方。
+
+### 地风升
+> （四世）坤上 巽下
+
+- **卦象**：灵鸟翱翔之卦，显达光明之象。
+- **判曰**：升者，进也。木生于土，萌芽渐长，积小成大，升进而上，宜见王公，褒嘉欢赏。出暗向明，亨通之象。
+
+### 水风井
+> （五世）坎上 巽下
+
+- **卦象**：珠藏深渊之卦，守静安常之象。
+- **判曰**：井者，静也。邑乃可改，并不可移，安身勿动，守道无亏。所作于人，且宜修之。逃亡难得，应没还期。
+
+### 泽风大过
+> （游魂）兑上 巽下
+
+- **卦象**：寒木生花之卦，本末俱弱之象。
+- **判曰**：大过者，祸也。四阳过盛，上下不胜，栋桡之象，事卒难明。两刑两克，所求不成。枯杨借生，自灭之征。
+
+### 泽雷随
+> （归魂）兑上 震下
+
+- **卦象**：良工琢玉之卦，如水推车之象。
+- **判曰**：随者，顺也。上刚下柔，随时之义。改故鼎新，众美俱至。士子得官，宜增禄位。百事遂意，吉无不利。
+
+## 巽宫八卦——属木
+
+### 巽为风
+> （纯卦）巽上 巽下（六冲）
+
+- **卦象**：风行草偃之卦，上行下效之象。
+- **判曰**：巽者，顺也。乃顺成天，动用相尚，消息交通，无诸蔽障。恶事不同，风飘其响。所作随顺，进达之象。
+
+### 风天小畜
+> （一世）巽上 乾下
+
+- **卦象**：匣藏宝剑之卦，密云不雨之象。
+- **判曰**：小畜者，塞也。密云不雨，夫妇反覆。信息不通，出行却伏，求事不成，迟而未速。
+
+### 风火家人
+> （二世）巽上 离下
+
+- **卦象**：入海求珠之卦，开花结子之象。
+- **判曰**：家人者，同也。阴阳得位，夫妇克隆，田木增广，财入本宫。婚姻之道，以存始终。不求自合，家庆融融。
+
+### 风雷益
+> （三世）巽上 震下
+
+- **卦象**：鸿鹄遇风之卦，滴水天河之象。
+- **判曰**：益者，损也。风雷相举，益道如然。小人达情，刑狱之愆。君子位变，见善则迁。利有攸往，行人速还。
+
+### 天雷无妄
+> （四世）乾上 震下（六冲）
+
+- **卦象**：石中蕴玉之卦，守旧安常之象.。
+- **判曰**：无妄者，天灾也。天雷震响，惊怖如摧。病勿与药，虽凶可为。百凡谋望，居安虑危。
+
+### 火雷噬嗑
+> （五世）离上 震下
+
+- **卦象**：日中为市之卦，颐中有物之象。
+- **判曰**：噬嗑者，啮也。上下相合，物在颐间，饮食之事，聚会相延，财爻持世。求之不难。所为事理，内外俱安。
+
+### 山雷颐
+> （游魂）良上 震下
+
+- **卦象**：龙隐深潭之卦，迁善远恶之象。
+- **判曰**：颐者，养也。谨言节食，能养其身。震动艮止，万物皆春。恶事消散，不害于人。
+
+### 山风蛊
+> （归魂）艮上 巽下
+
+- **卦象**：三虫食血之卦，以恶害义之象。
+- **判曰**：蛊者，事也。干父之体，任用于先，三虫在器，阴害相连。厌昧之事，其疾难痊。求谋欲起，虑恐相干。
+
+## 坎宫八卦——属水
+
+### 坎为水
+> （纯卦）坎上 坎下（六冲）
+
+- **卦象**：船渡重滩之卦，外虚中实之象。
+- **判曰**：坎者，陷也。逢流则注，遇坎则止。出入艰难，随坎不已。阴愁伏匿，共相谋计，千里辞家，始免迍（zhūn）否。
+
+### 水泽节
+> （一世）坎上 兑下（六合）
+
+- **卦象**：船行风横之卦，寒暑有节之象。
+- **判曰**：节者，止也。天地得节，四时所成。节以制度，俭以丰盈。内忧外悦，不出户庭，于身谨节，无不康宁。
+
+### 水雷屯
+> （二世）坎上 震下
+
+- **卦象**：龙居浅水之卦，万物始生之象。
+- **判曰**：屯（zhūn）者，难也。象迍（zhūn）之时，动则难生，如常之事，先易后争。时方屯难，切忌远行，婚姻即吉，谋望不亨。
+
+### 水火既济
+> （三世）坎上 离下
+
+- **卦象**：舟楫济川之卦，阴阳配合之象。
+- **判曰**：既济，合也。水火相遇，会合之义。往渡得船，成功必济。所求必从，所从必遂。斯不失时，谓之既济。
+
+### 泽火革
+> （四世）兑上 离下
+
+- **卦象**：豹变为虎之卦，改旧从新之象。
+- **判曰**：革者，改也。改故就新，变易之道。交易其所，君子豹变。时有不遇，并宜改革。守旧则凶，从新则吉。
+
+### 雷火丰
+> （五世）震上 离下
+
+- **卦象**：日丽中天之卦，背暗向明之象。
+- **判曰**：丰者，大也。日中见斗，幽而不明，此事适大，隐映其形。水中见日，无所取呈。求财未得，事卒难明。
+
+### 地火明夷
+> （游魂）坤上 离下
+
+- **卦象**：凤凰垂翼之卦，出明入暗之象。
+- **判曰**：明夷者，伤也。火入地中，掩伤明德。君子在厄，三日不食。文王之难，困于丛棘。百凡谋望，且宜止息。
+
+### 地水师
+> （归魂）坤上 坎下
+
+- **卦象**：天马出群之卦，以寡伏众之象。
+- **判曰**：师者，众也。独行越师，最不宜动。君子有命，小人勿用。共相克伐，政道成讼。
+
+## 艮宫八卦——属土
+
+### 艮为山
+> （纯卦）艮上 艮下（六冲）
+
+- **卦象**：游鱼避网之卦，积小成高之象。
+- **判曰**：艮者，止也。纯艮危危，安静无亏。时止则止，时移则移。钱财散失，失在小儿，寻求不得，东北宜之。
+
+### 山火贲
+> （一世）艮上 离下
+
+- **卦象**：猛虎负嵎之卦，光明通泰之象。
+- **判曰**：贲者，饰也。光彩烜赫，火色含丹，文章交错，应杂其间，进退荣益，束帛戋戋。
+
+### 山天大畜
+> （二世）艮上 乾下
+
+- **卦象**：积小成高之卦，龙潜大壑之象。
+- **判曰**：大畜者，聚也。刚健笃实，积聚丰隆。居官食禄，建立其功。论讼有益。道理亨通。利涉大川，后吉先凶。
+
+### 山泽损
+> （三世）艮上 兑下
+
+- **卦象**：凿石见玉之卦，握土为山之象。
+- **判曰**：损者，益也。损上益下，后易先难。本非走失，事主忧官。必损而已，何以为安。
+
+### 火泽睽
+> （四世）离上 兑下
+
+- **卦象**：猛虎陷井之卦，二女同居之象。
+- **判曰**：睽者，背也。志不相得，作事乖违。口舌相伴，财散人离。病者难瘥，行者不归。
+
+### 天泽履
+> （五世）乾上 兑下
+
+- **卦象**：如履虎尾之卦，安中防危之象。
+- **判曰**：履者，礼也。如履虎尾，防虑宜深。坚冰之患，戒慎兢兢。安中防危，忧中望喜。眇而能视，跛而能履。
+
+### 风泽中孚
+> （游魂）巽上 兑下
+
+- **卦象**：鹤鸣子和之卦，事有定期之象。
+- **判曰**：中孚，信也。天地养育，万物安居，泽被草木，信及豚鱼。利涉大川，厄难消除。
+
+### 风山渐
+> （归魂）巽上 艮下
+
+- **卦象**：高山植木之卦，积小成大之象。
+- **判曰**：渐者，进也。渐进之义，动静皆宜。食无求饱，款曲施为，婚姻和合，行人将归。
+
+## 坤宫八卦——属土
+
+### 坤为地
+> （纯卦）坤上 坤下（六冲）
+
+- **卦象**：生载万物之卦，博厚无疆之象。
+- **判曰**：坤者，顺也。乃顺成天，万物资生。用动则浊，用静则清。所作有顺，万物皆成。
+
+### 地雷复
+> （一世）坤上 震下（六合）
+
+- **卦象**：淘沙见金之卦，反覆往来之象。
+- **判曰**：复者，反也。内悦外顺，举动无违。世应相合，迁官益财。失而复得，往而复来。婚姻占得，夫妇和谐。
+
+### 地泽临
+> （二世）坤上 兑下
+
+- **卦象**：凤入鸡群之卦，以上临下之象。
+- **判曰**：临者，大也。以大临小，以上临下，内柔外和，人非欺诈。居官进升，文才和雅。纵有灾害，不能相惹。
+
+### 地天泰
+> （三世）坤上 乾下（六合）
+
+- **卦象**：天地交畅之卦，小往大来之象。
+- **判曰**：泰者，通也。天地交泰，阴阳和光，麒麟悉出，丹凤来翔。小人道灭，君子道昌，求谋顺遂，恶事消亡。
+
+### 雷天大壮
+> （四世）震上 乾下（六冲）
+
+- **卦象**：先顺后逆之卦，羝羊触藩之象。
+- **判曰**：大壮者，志也。羝羊触藩，其道难全。令人刚强，已成过愆。非利勿贪，善莫大焉。
+
+### 泽天夬
+> （五世）兑上 乾下
+
+- **卦象**：神剑斩蛟之卦，先损后益之象。
+- **判曰**：夬者，决也。乾兑相刑，恶闻其声。文字契约，事未易成，必须刚断，始得吉亨。
+
+### 水天需
+> （游魂）坎上 乾下
+
+- **卦象**：云霭中天之卦，密云不雨之象。
+- **判曰**：需者，须也。云行于天，见险不前，身将有厄，恐被勾连。大事欲至，忧虑悬悬，光亨贞吉，利涉大川。
+
+### 水地比
+> （归魂）坎上 下坤
+
+- **卦象**：众星拱北之卦，水行地上之象。
+- **判曰**：比者，和也。抚临万国，内通外流，水行于地，本性和柔。先王制礼，以亲诸侯，元永贞吉，百事无忧。

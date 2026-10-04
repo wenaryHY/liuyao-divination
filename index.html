@@ -235,12 +235,33 @@ function initSelects() {
 
   // 默认当前时间填充月建/日干支
   const fillCurrentTime = () => {
-    if (!window.Lunar) return false;
-    const now = new Date();
-    const lunar = window.Lunar.fromDate(now);
-    mzSel.value = lunar.getMonthZhi();
-    $('#day-gz').value = lunar.getDayGanZhi();
-    return true;
+    if (!window.Lunar) {
+      console.debug('Lunar not ready');
+      return false;
+    }
+    try {
+      const now = new Date();
+      const lunar = window.Lunar.fromDate(now);
+      const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : '';
+      let dayGz = '';
+      if (lunar.getDayGanZhi) {
+        dayGz = lunar.getDayGanZhi();
+        // 只取前两字（干支），去掉可能的"日"字等后缀
+        dayGz = dayGz.slice(0, 2);
+      }
+      if (monthZhi) mzSel.value = monthZhi;
+      if (dayGz && dayGz.length === 2) {
+        $('#day-gz').value = dayGz;
+      } else {
+        console.warn('Invalid dayGz:', dayGz);
+        return false;
+      }
+      console.log('Auto-filled:', monthZhi, dayGz);
+      return true;
+    } catch (e) {
+      console.error('fillCurrentTime error:', e);
+      return false;
+    }
   };
   // 立即尝试
   if (!fillCurrentTime()) {
@@ -248,7 +269,14 @@ function initSelects() {
     const timer = setInterval(() => {
       if (fillCurrentTime()) clearInterval(timer);
     }, 50);
-    setTimeout(() => clearInterval(timer), 2000);
+    setTimeout(() => {
+      clearInterval(timer);
+      // 最后兜底：手动设置一个默认值，避免验证报错
+      if (!$('#day-gz').value) {
+        $('#day-gz').value = '甲子';
+        console.warn('Fallback to default day-gz: 甲子');
+      }
+    }, 3000);
   }
 
   // 用神

@@ -510,10 +510,10 @@ function buildAIText(args, boardText) {
   md.push('# 六爻排盘 - AI 解卦参考');
   md.push('');
   md.push('## 基础信息');
-  md.push(`- 起卦方式：${methodLabel(args)}`);
-  md.push(`- 公历：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`);
-  if (lunar) md.push(`- 农历：${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()} ${lunar.getTimeZhi()}时`);
-  md.push(`- 月建：${args.month_zhi} / 日干支：${args.day_gz}`);
+  md.push(\`- 起卦方式：${methodLabel(args)}\`);
+  md.push(\`- 公历：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}\`);
+  if (lunar) md.push(\`- 农历：${lunar.getYearInChinese()}年${lunar.getMonthInChinese()}月${lunar.getDayInChinese()} ${lunar.getTimeZhi()}时\`);
+  md.push(\`- 月建：${args.month_zhi} / 日干支：${args.day_gz}\`);
   md.push('');
   md.push('## 卦盘原文');
   md.push('```');
@@ -521,30 +521,28 @@ function buildAIText(args, boardText) {
   md.push('```');
   md.push('');
   md.push('## 断卦流程目录（请逐条访问链接获取详细规则）');
-    rulesIndex.forEach(r => {
-    md.push(\### \. \);
+  rulesIndex.forEach(r => {
+    md.push(\`### ${r.step}. ${r.title}\`);
     // Embed actual reference content instead of just link
     if (REFS_CONTENT[r.step]) {
       md.push('');
       md.push('---');
-      md.push(\#### 参考文档：\);
+      md.push(\`#### 参考文档：${r.title}\`);
       md.push('');
       md.push(REFS_CONTENT[r.step]);
       md.push('');
       md.push('---');
     }
-    md.push(\- 文档链接：\\);
+    md.push(\`- 文档链接：${GITHUB_BASE}${r.file}\`);
     md.push('');
   });
   md.push('---');
   md.push('**重要提示**：以上规则仅为目录索引，具体断卦细则必须逐条访问上述 GitHub Raw 链接查阅完整文档。未联网查阅视为断卦失败。');
   md.push('');
   md.push('## 卦例参考');
-  md.push(`- 实战案例：${GITHUB_BASE}11-%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E6%96%87%E6%9C%AC.md`);
+  md.push(\`- 实战案例：${GITHUB_BASE}11-%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E6%96%87%E6%9C%AC.md\`);
   return md.join('\n');
-}
-
-function methodLabel(args) {
+}function methodLabel(args) {
   const m = $('#method').value;
   return {'manual':'手动摆卦','random':'模拟摇卦','time':'时间起卦(辅助)'}[m];
 }

@@ -204,7 +204,23 @@ pre {
   function waitForLunar() {
     console.log("[DEBUG] waitForLunar started");
     return new Promise(resolve => {
-      const checkLunar = () => window.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
+      const checkLunar = () => {
+        // First check known names
+        const known = window.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
+        if (known) return known;
+        // Debug: scan window for any Lunar-like properties
+        const candidates = [];
+        for (const key of Object.keys(window)) {
+          const kl = key.toLowerCase();
+          if (kl.includes("lunar") || kl.includes("calendar") || kl.includes("ganzhi") || kl.includes("gan") || kl.includes("zhi")) {
+            candidates.push(key);
+          }
+        }
+        if (candidates.length > 0) {
+          console.log("[DEBUG] Lunar candidates on window:", candidates);
+        }
+        return null;
+      };
       if (checkLunar()) { 
         window.Lunar = checkLunar(); 
         console.log("[DEBUG] Lunar found immediately:", Object.keys(window.Lunar).slice(0,5));

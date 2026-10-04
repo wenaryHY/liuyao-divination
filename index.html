@@ -233,6 +233,9 @@ const $$ = (sel) => document.querySelectorAll(sel);
 // GitHub raw 文档基础 URL
 const GITHUB_BASE = 'https://raw.githubusercontent.com/wenaryHY/liuyao-divination/main/references/';
 
+// 历史记录数组
+let history = [];
+
 /* ===== 初始化下拉选项 ===== */
 async function initSelects() {
   await waitForLunar();

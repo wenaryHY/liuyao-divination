@@ -203,16 +203,15 @@ pre {
   // Wait for Lunar to be ready, then initialize selects
   function waitForLunar() {
     return new Promise(resolve => {
-      // Check common global names used by lunar-javascript
       const checkLunar = () => window.Lunar || window.lunar || window.LunarJS || window['lunar-javascript'];
       if (checkLunar()) { window.Lunar = checkLunar(); return resolve(); }
       
       const script = document.getElementById('lunar-script');
       script.onload = () => {
-        // Give it a moment to register
         setTimeout(() => {
           if (checkLunar()) { window.Lunar = checkLunar(); resolve(); }
-        }, 100);
+          else { console.warn('Lunar onload but not registered'); }
+        }, 50);
       };
       // Fallback: poll
       const timer = setInterval(() => {
@@ -334,9 +333,11 @@ async function initPyodide() {
       stderr: (msg) => console.warn('[Pyodide]', msg)
     });
 
-    // 创建目录结构（忽略已存在错误）
-    try { await pyodide.FS.mkdir('/home/pyodide/liuyao_pkg'); } catch(e) { console.debug('mkdir liuyao_pkg:', e.message); }
-    try { await pyodide.FS.mkdir('/home/pyodide/liuyao_pkg/liuyao'); } catch(e) { console.debug('mkdir liuyao:', e.message); }
+    // 使用 Python 侧创建完整目录树（避免 FS.mkdir 限制）
+    await pyodide.runPython(`
+import os
+os.makedirs('/home/pyodide/liuyao_pkg/liuyao', exist_ok=True)
+`);
 
     // 写入 liuyao 包到虚拟 FS
     const pkg = JSON.parse(document.getElementById('liuyao-pkg').textContent);
@@ -373,13 +374,6 @@ def _cast(args):
   }
 }
 
-function updateProgress(msg) {
-  const m = msg.match(/(\d+)%/);
-  if (m) {
-    const bar = document.querySelector('#pyodide-progress > div');
-    if (bar) bar.style.width = m[1] + '%';
-  }
-}
 function updateProgress(msg) {
   const m = msg.match(/(\d+)%/);
   if (m) {

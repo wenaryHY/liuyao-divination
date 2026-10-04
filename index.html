@@ -362,7 +362,7 @@ async function initPyodide() {
     await pyodide.runPython(pythonImport);
     console.log("[DEBUG] liuyao module imported");
 
-    castBoard = (args) => pyodide.runPython("_cast(" + JSON.stringify(args) + ")");
+    castBoard = (args) => pyodide.runPython("_cast(" + JSON.stringify(args).replace(/null/g, "None") + ")");
 
     status.textContent = "Ready";
     status.className = "status ok";

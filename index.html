@@ -537,8 +537,14 @@ function methodLabel(args) {
 function loadHistory() {
   try {
     const saved = localStorage.getItem('liuyao_history');
-    if (saved) history = JSON.parse(saved);
-  } catch {}
+    if (saved) {
+      history = JSON.parse(saved);
+    } else {
+      history = [];
+    }
+  } catch {
+    history = [];
+  }
 }
 
 function saveHistory(args, boardText, aiText) {

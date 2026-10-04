@@ -197,11 +197,8 @@ pre {
 
 <!-- Pyodide -->
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
-<!-- lunar-javascript (ESM) -->
-<script type="module">
-  import { Lunar } from 'https://cdn.jsdelivr.net/npm/lunar-javascript@latest/dist/lunar.esm.js';
-  window.Lunar = Lunar;
-</script>
+<!-- lunar-javascript (UMD, sync load) -->
+<script src="https://cdn.jsdelivr.net/npm/lunar-javascript@latest/dist/lunar.umd.js"></script>
 
 <!-- 应用主逻辑 -->
 <script>

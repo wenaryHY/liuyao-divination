@@ -397,20 +397,8 @@ function updateProgress(msg) {
     if (bar) bar.style.width = m[1] + "%";
   }
 }
-function updateProgress(msg) {
-  const m = msg.match(/(\d+)%/);
-  if (m) {
-    const bar = document.querySelector("#pyodide-progress > div");
-    if (bar) bar.style.width = m[1] + "%";
-  }
-}
-function updateProgress(msg) {
-  const m = msg.match(/(\d+)%/);
-  if (m) {
-    const bar = document.querySelector('#pyodide-progress > div');
-    if (bar) bar.style.width = m[1] + '%';
-  }
-}
+
+
 
 /* ===== 起卦核心逻辑 ===== */
 function getFormArgs() {

@@ -220,7 +220,7 @@ function initSelects() {
   hexList.forEach(h => {
     const opt = document.createElement('option');
     opt.value = h.name;
-    opt.textContent = `${h.idx}. ${h.name} (${h.upper}${h.lower})`;
+    opt.textContent = h.idx + '. ' + h.name + ' (' + h.upper + h.lower + ')';
     hexSel.appendChild(opt);
   });
 
@@ -232,13 +232,24 @@ function initSelects() {
     opt.value = z; opt.textContent = z;
     mzSel.appendChild(opt);
   });
-  // 默认当前月建
-  const now = new Date();
-  const lunar = window.Lunar?.fromDate(now);
-  if (lunar) mzSel.value = lunar.getMonthZhi();
 
-  // 日干支默认
-  if (lunar) $('#day-gz').value = lunar.getDayGanZhi();
+  // 默认当前时间填充月建/日干支
+  const fillCurrentTime = () => {
+    if (!window.Lunar) return false;
+    const now = new Date();
+    const lunar = window.Lunar.fromDate(now);
+    mzSel.value = lunar.getMonthZhi();
+    $('#day-gz').value = lunar.getDayGanZhi();
+    return true;
+  };
+  // 立即尝试
+  if (!fillCurrentTime()) {
+    // Lunar 可能还在加载，轮询等待
+    const timer = setInterval(() => {
+      if (fillCurrentTime()) clearInterval(timer);
+    }, 50);
+    setTimeout(() => clearInterval(timer), 2000);
+  }
 
   // 用神
   const qin = ["父母","兄弟","子孙","妻财","官鬼"];

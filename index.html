@@ -197,65 +197,54 @@ pre {
 
 <!-- Pyodide -->
 <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
-<!-- lunar-javascript (UMD) -->
-<script id="lunar-script" src="https://cdn.jsdelivr.net/npm/lunar-javascript@latest/dist/lunar.umd.js"></script>
+<!-- Lunar: try ESM dynamic import first, fallback to UMD -->
 <script>
-  // Wait for Lunar to be ready, then initialize selects
-  function waitForLunar() {
-    console.log("[DEBUG] waitForLunar started");
-    return new Promise(resolve => {
-      const checkLunar = () => {
-        // First check known names
-        const known = window.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
-        if (known) return known;
-        // Debug: scan window for any Lunar-like properties
-        const candidates = [];
-        for (const key of Object.keys(window)) {
-          const kl = key.toLowerCase();
-          if (kl.includes("lunar") || kl.includes("calendar") || kl.includes("ganzhi") || kl.includes("gan") || kl.includes("zhi")) {
-            candidates.push(key);
+  // Load lunar-javascript via dynamic import (ESM)
+  async function loadLunar() {
+    console.log("[DEBUG] Loading lunar-javascript via dynamic import...");
+    try {
+      const mod = await import("https://cdn.jsdelivr.net/npm/lunar-javascript@latest/dist/lunar.esm.js");
+      // ESM default export
+      window.Lunar = mod.default || mod.Lunar || mod;
+      console.log("[DEBUG] Lunar loaded via ESM:", Object.keys(window.Lunar).slice(0,5));
+      return window.Lunar;
+    } catch (e) {
+      console.warn("[DEBUG] ESM import failed, trying UMD:", e.message);
+      // Fallback: load UMD script
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/lunar-javascript@latest/dist/lunar.umd.js";
+        script.onload = () => {
+          // UMD might register as Lunar, lunar, or LunarJS
+          const lunar = window.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
+          if (lunar) {
+            window.Lunar = lunar;
+            console.log("[DEBUG] Lunar loaded via UMD:", Object.keys(window.Lunar).slice(0,5));
+            resolve(window.Lunar);
+          } else {
+            console.warn("[DEBUG] UMD loaded but no Lunar found on window");
+            // Scan window for any lunar-like objects
+            const candidates = Object.keys(window).filter(k => k.toLowerCase().includes("lunar"));
+            console.log("[DEBUG] Lunar candidates after UMD:", candidates);
+            reject(new Error("Lunar not found after UMD load"));
           }
-        }
-        if (candidates.length > 0) {
-          console.log("[DEBUG] Lunar candidates on window:", candidates);
-        }
-        return null;
-      };
-      if (checkLunar()) { 
-        window.Lunar = checkLunar(); 
-        console.log("[DEBUG] Lunar found immediately:", Object.keys(window.Lunar).slice(0,5));
-        return resolve(); 
-      }
-      
-      const script = document.getElementById("lunar-script");
-      script.onload = () => {
-        setTimeout(() => {
-          if (checkLunar()) { 
-            window.Lunar = checkLunar(); 
-            console.log("[DEBUG] Lunar found on onload");
-            resolve(); 
-          } else { 
-            console.warn("[DEBUG] Lunar onload but not registered"); 
-          }
-        }, 50);
-      };
-      // Fallback: poll
-      const timer = setInterval(() => {
-        if (checkLunar()) { 
-          clearInterval(timer); 
-          window.Lunar = checkLunar(); 
-          console.log("[DEBUG] Lunar found via polling");
-          resolve(); 
-        }
-      }, 50);
-      // Timeout after 5 seconds
-      setTimeout(() => { 
-        clearInterval(timer); 
-        console.error("[DEBUG] Lunar load timeout"); 
-        resolve(); 
-      }, 5000);
-    });
+        };
+        script.onerror = () => reject(new Error("UMD script load failed"));
+        document.head.appendChild(script);
+      });
+    }
   }
+
+  // Wait for Lunar to be ready
+  async function waitForLunar() {
+    console.log("[DEBUG] waitForLunar started");
+    try {
+      await loadLunar();
+    } catch (e) {
+      console.error("[DEBUG] Lunar load failed:", e.message);
+    }
+  }
+</script>
 
 /* ===== DOM 引用 ===== */
 const $ = (sel) => document.querySelector(sel);
@@ -264,6 +253,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 /* ===== 初始化下拉选项 ===== */
 async function initSelects() {
   await waitForLunar();
+  console.log("[DEBUG] initSelects after waitForLunar, Lunar:", !!window.Lunar);
   // 64 卦
   const hexList = JSON.parse(document.getElementById('hexagram-list').textContent);
   const hexSel = $('#hexagram');

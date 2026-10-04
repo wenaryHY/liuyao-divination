@@ -256,15 +256,15 @@ async function initSelects() {
   // 默认当前时间填充月建/日干支
   const fillCurrentTime = () => {
     console.log("[DEBUG] fillCurrentTime called");
-    const Lunar = window.Lunar.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
+    const Lunar = window.Lunar.Lunar;
     if (!Lunar) {
       console.debug("[DEBUG] Lunar not ready");
       return false;
     }
     try {
       const now = new Date();
-      const lunar = Lunar.Lunar.fromDate(now);
-      console.log("[DEBUG] Lunar.Lunar.fromDate ok, lunar:", !!lunar);
+      const lunar = Lunar.fromDate(now);
+      console.log("[DEBUG] Lunar.fromDate ok, lunar:", !!lunar);
       const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
       let dayGz = "";
       if (lunar.getDayGanZhi) {

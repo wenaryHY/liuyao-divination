@@ -315,24 +315,28 @@ async function initPyodide() {
       stderr: (msg) => console.warn('[Pyodide]', msg)
     });
 
+    // 创建目录结构
+    await pyodide.FS.mkdir('/home/pyodide/liuyao_pkg');
+    await pyodide.FS.mkdir('/home/pyodide/liuyao_pkg/liuyao');
+
     // 写入 liuyao 包到虚拟 FS
     const pkg = JSON.parse(document.getElementById('liuyao-pkg').textContent);
     for (const [relPath, content] of Object.entries(pkg)) {
-      const fullPath = `/home/pyodide/liuyao_pkg/${relPath}`;
+      const fullPath = '/home/pyodide/liuyao_pkg/' + relPath;
       await pyodide.FS.writeFile(fullPath, content, { encoding: 'utf8' });
     }
 
     // 导入并暴露 cast_board
-    await pyodide.runPython(`
+    await pyodide.runPython(\`
 import sys
 sys.path.insert(0, '/home/pyodide/liuyao_pkg')
 from liuyao import cast_board, format_board
 def _cast(args):
     board = cast_board(args['hexagram'], args['moving'], args['month_zhi'], args['day_gz'], args.get('yongshen_qin'))
     return format_board(board)
-`);
+\`);
 
-    castBoard = (args) => pyodide.runPython(`_cast(${JSON.stringify(args)})`);
+    castBoard = (args) => pyodide.runPython('_cast(' + JSON.stringify(args) + ')');
 
     status.textContent = '就绪';
     status.className = 'status ok';
@@ -345,6 +349,13 @@ def _cast(args):
   }
 }
 
+function updateProgress(msg) {
+  const m = msg.match(/(\d+)%/);
+  if (m) {
+    const bar = document.querySelector('#pyodide-progress > div');
+    if (bar) bar.style.width = m[1] + '%';
+  }
+}
 function updateProgress(msg) {
   const m = msg.match(/(\d+)%/);
   if (m) {

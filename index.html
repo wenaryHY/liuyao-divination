@@ -359,7 +359,7 @@ async function initPyodide() {
     console.log("[DEBUG] Writing package files...");
     const pkg = JSON.parse(document.getElementById("liuyao-pkg").textContent);
     for (const [relPath, content] of Object.entries(pkg)) {
-      const fullPath = "/home/pyodide/liuyao_pkg/" + relPath;
+      const fullPath = "/home/pyodide/liuyao_pkg/" + relPath.replace(/\\/g, "/");
       try {
         await pyodide.FS.writeFile(fullPath, content, { encoding: "utf8" });
       } catch (e) {

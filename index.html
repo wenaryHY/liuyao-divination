@@ -202,34 +202,44 @@ pre {
 <script>
   // Wait for Lunar to be ready, then initialize selects
   function waitForLunar() {
+    console.log("[DEBUG] waitForLunar started");
     return new Promise(resolve => {
-      const checkLunar = () => window.Lunar || window.lunar || window.LunarJS || window['lunar-javascript'];
-      if (checkLunar()) { window.Lunar = checkLunar(); return resolve(); }
+      const checkLunar = () => window.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
+      if (checkLunar()) { 
+        window.Lunar = checkLunar(); 
+        console.log("[DEBUG] Lunar found immediately:", Object.keys(window.Lunar).slice(0,5));
+        return resolve(); 
+      }
       
-      const script = document.getElementById('lunar-script');
+      const script = document.getElementById("lunar-script");
       script.onload = () => {
         setTimeout(() => {
-          if (checkLunar()) { window.Lunar = checkLunar(); resolve(); }
-          else { console.warn('Lunar onload but not registered'); }
+          if (checkLunar()) { 
+            window.Lunar = checkLunar(); 
+            console.log("[DEBUG] Lunar found on onload");
+            resolve(); 
+          } else { 
+            console.warn("[DEBUG] Lunar onload but not registered"); 
+          }
         }, 50);
       };
       // Fallback: poll
       const timer = setInterval(() => {
-        if (checkLunar()) { clearInterval(timer); window.Lunar = checkLunar(); resolve(); }
+        if (checkLunar()) { 
+          clearInterval(timer); 
+          window.Lunar = checkLunar(); 
+          console.log("[DEBUG] Lunar found via polling");
+          resolve(); 
+        }
       }, 50);
       // Timeout after 5 seconds
-      setTimeout(() => { clearInterval(timer); console.error('Lunar load timeout'); resolve(); }, 5000);
+      setTimeout(() => { 
+        clearInterval(timer); 
+        console.error("[DEBUG] Lunar load timeout"); 
+        resolve(); 
+      }, 5000);
     });
   }
-</script>
-
-<!-- 应用主逻辑 -->
-<script>
-/* ===== 全局状态 ===== */
-let pyodide = null;
-let castBoard = null;
-let history = [];
-const GITHUB_BASE = 'https://raw.githubusercontent.com/wenaryHY/liuyao-divination/main/references/';
 
 /* ===== DOM 引用 ===== */
 const $ = (sel) => document.querySelector(sel);
@@ -259,34 +269,38 @@ async function initSelects() {
 
   // 默认当前时间填充月建/日干支
   const fillCurrentTime = () => {
-    const Lunar = window.Lunar || window.lunar || window.LunarJS || window['lunar-javascript'];
+    console.log("[DEBUG] fillCurrentTime called");
+    const Lunar = window.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
     if (!Lunar) {
-      console.debug('Lunar not ready');
+      console.debug("[DEBUG] Lunar not ready");
       return false;
     }
     try {
       const now = new Date();
       const lunar = Lunar.fromDate(now);
-      const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : '';
-      let dayGz = '';
+      console.log("[DEBUG] Lunar.fromDate ok, lunar:", !!lunar);
+      const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
+      let dayGz = "";
       if (lunar.getDayGanZhi) {
         dayGz = lunar.getDayGanZhi();
         // 只取前两字（干支），去掉可能的"日"字等后缀
         dayGz = dayGz.slice(0, 2);
       }
+      console.log("[DEBUG] Month zhi:", monthZhi, "Day gz:", dayGz);
       if (monthZhi) mzSel.value = monthZhi;
       if (dayGz && dayGz.length === 2) {
-        $('#day-gz').value = dayGz;
+        document.getElementById("day-gz").value = dayGz;
+        console.log("[DEBUG] Auto-filled successfully:", monthZhi, dayGz);
+        return true;
       } else {
-        console.warn('Invalid dayGz:', dayGz);
+        console.warn("[DEBUG] Invalid dayGz:", dayGz);
         return false;
       }
-      console.log('Auto-filled:', monthZhi, dayGz);
-      return true;
     } catch (e) {
-      console.error('fillCurrentTime error:', e);
+      console.error("[DEBUG] fillCurrentTime error:", e);
       return false;
     }
+  };
   };
   // 此时 Lunar 已就绪，直接填充
   if (!fillCurrentTime()) {
@@ -317,63 +331,79 @@ $('#use-current-time').addEventListener('change', e => {
 
 /* ===== Pyodide 初始化 ===== */
 async function initPyodide() {
-  const status = $('#status');
-  status.textContent = '正在加载 Python 运行时...';
-  status.className = 'status';
+  console.log("[DEBUG] initPyodide started");
+  const status = document.getElementById("status");
+  status.textContent = "Loading Python runtime...";
+  status.className = "status";
 
-  const progressBar = document.createElement('div');
-  progressBar.id = 'pyodide-progress';
-  progressBar.innerHTML = '<div></div>';
+  const progressBar = document.createElement("div");
+  progressBar.id = "pyodide-progress";
+  progressBar.innerHTML = "<div></div>";
   status.parentNode.insertBefore(progressBar, status.nextSibling);
 
   try {
+    console.log("[DEBUG] Loading Pyodide...");
     pyodide = await loadPyodide({
       indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-      stdout: (msg) => { if(msg.includes('%')) updateProgress(msg); },
-      stderr: (msg) => console.warn('[Pyodide]', msg)
+      stdout: (msg) => { if(msg.includes("%")) updateProgress(msg); },
+      stderr: (msg) => console.warn("[Pyodide stderr]", msg)
     });
+    console.log("[DEBUG] Pyodide loaded");
 
-    // 使用 Python 侧创建完整目录树（避免 FS.mkdir 限制）
-    await pyodide.runPython(`
-import os
-os.makedirs('/home/pyodide/liuyao_pkg/liuyao', exist_ok=True)
-`);
+    // Use Python to create directory tree (bypasses FS.mkdir limitations)
+    console.log("[DEBUG] Creating directory tree via Python...");
+    const pythonMkdir = "import os\nos.makedirs(\"/home/pyodide/liuyao_pkg/liuyao\", exist_ok=True)\nprint(\"Python: directories created\")";
+    await pyodide.runPython(pythonMkdir);
+    console.log("[DEBUG] Directories created");
 
-    // 写入 liuyao 包到虚拟 FS
-    const pkg = JSON.parse(document.getElementById('liuyao-pkg').textContent);
+    // Write liuyao package to virtual FS
+    console.log("[DEBUG] Writing package files...");
+    const pkg = JSON.parse(document.getElementById("liuyao-pkg").textContent);
     for (const [relPath, content] of Object.entries(pkg)) {
-      const fullPath = '/home/pyodide/liuyao_pkg/' + relPath;
+      const fullPath = "/home/pyodide/liuyao_pkg/" + relPath;
       try {
-        await pyodide.FS.writeFile(fullPath, content, { encoding: 'utf8' });
+        await pyodide.FS.writeFile(fullPath, content, { encoding: "utf8" });
       } catch (e) {
-        console.error('writeFile failed:', relPath, e.message);
+        console.error("[DEBUG] writeFile failed:", relPath, e.message);
         throw e;
       }
     }
+    console.log("[DEBUG] Package files written");
 
-    // 导入并暴露 cast_board
-    await pyodide.runPython(\`
-import sys
-sys.path.insert(0, '/home/pyodide/liuyao_pkg')
-from liuyao import cast_board, format_board
-def _cast(args):
-    board = cast_board(args['hexagram'], args['moving'], args['month_zhi'], args['day_gz'], args.get('yongshen_qin'))
-    return format_board(board)
-\`);
+    // Import and expose cast_board
+    console.log("[DEBUG] Importing liuyao module...");
+    const pythonImport = "import sys\nsys.path.insert(0, \"/home/pyodide/liuyao_pkg\")\nfrom liuyao import cast_board, format_board\ndef _cast(args):\n    board = cast_board(args[\"hexagram\"], args[\"moving\"], args[\"month_zhi\"], args[\"day_gz\"], args.get(\"yongshen_qin\"))\n    return format_board(board)\nprint(\"Python: liuyao imported\")";
+    await pyodide.runPython(pythonImport);
+    console.log("[DEBUG] liuyao module imported");
 
-    castBoard = (args) => pyodide.runPython('_cast(' + JSON.stringify(args) + ')');
+    castBoard = (args) => pyodide.runPython("_cast(" + JSON.stringify(args) + ")");
 
-    status.textContent = '就绪';
-    status.className = 'status ok';
+    status.textContent = "Ready";
+    status.className = "status ok";
     progressBar.remove();
-    $('#btn-cast').disabled = false;
+    document.getElementById("btn-cast").disabled = false;
+    console.log("[DEBUG] initPyodide completed successfully");
   } catch (err) {
-    status.textContent = '初始化失败: ' + err.message;
-    status.className = 'status err';
-    console.error(err);
+    console.error("[DEBUG] initPyodide error:", err);
+    status.textContent = "Init failed: " + err.message;
+    status.className = "status err";
   }
 }
 
+function updateProgress(msg) {
+  const m = msg.match(/(\d+)%/);
+  if (m) {
+    const bar = document.querySelector("#pyodide-progress > div");
+    if (bar) bar.style.width = m[1] + "%";
+  }
+}
+function updateProgress(msg) {
+  const m = msg.match(/(\d+)%/);
+  if (m) {
+    const bar = document.querySelector("#pyodide-progress > div");
+    if (bar) bar.style.width = m[1] + "%";
+  }
+}
 function updateProgress(msg) {
   const m = msg.match(/(\d+)%/);
   if (m) {

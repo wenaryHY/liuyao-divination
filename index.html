@@ -452,7 +452,7 @@ function getFormArgs() {
 
     // 自动填充月建/日干支
     $('#month-zhi').value = lunar.getMonthZhi();
-    $('#day-gz').value = lunar.getDayGanZhi();
+    $('#day-gz').value = lunar.getDayGan() + lunar.getDayZhi();
   }
 
   return { hexagram, moving, month_zhi, day_gz, yongshen_qin };

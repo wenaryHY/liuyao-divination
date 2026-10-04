@@ -267,12 +267,13 @@ async function initSelects() {
       console.log("[DEBUG] Lunar.fromDate ok, lunar:", !!lunar);
       const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
       let dayGz = "";
-            console.log("[DEBUG]             // Get day Gan and Zhi separately and combine
-            const dayGan = typeof lunar.getDayGan === 'function' ? lunar.getDayGan() : "";
-            const dayZhi = typeof lunar.getDayZhi === 'function' ? lunar.getDayZhi() : "";
-            console.log("[DEBUG] Day Gan:", dayGan, "Day Zhi:", dayZhi);
-            dayGz = dayGan + dayZhi;
-            console.log("[DEBUG] Raw dayGz:", dayGz);console.log("[DEBUG] Month zhi:", monthZhi, "Day gz:", dayGz);
+      // Get day Gan and Zhi separately and combine
+      const dayGan = typeof lunar.getDayGan === 'function' ? lunar.getDayGan() : "";
+      const dayZhi = typeof lunar.getDayZhi === 'function' ? lunar.getDayZhi() : "";
+      console.log("[DEBUG] Day Gan:", dayGan, "Day Zhi:", dayZhi);
+      dayGz = dayGan + dayZhi;
+      console.log("[DEBUG] Raw dayGz:", dayGz);
+      console.log("[DEBUG] Month zhi:", monthZhi, "Day gz:", dayGz);
       if (monthZhi) mzSel.value = monthZhi;
       if (dayGz && dayGz.length === 2) {
         document.getElementById("day-gz").value = dayGz;

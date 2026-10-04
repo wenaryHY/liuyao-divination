@@ -267,12 +267,18 @@ async function initSelects() {
       console.log("[DEBUG] Lunar.fromDate ok, lunar:", !!lunar);
       const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
       let dayGz = "";
-      if (lunar.getDayGanZhi) {
+            console.log("[DEBUG] Lunar methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(lunar)).filter(m => m.includes('Day') || m.includes('Gan') || m.includes('Zhi')));
+      if (typeof lunar.getDayGanZhi === 'function') {
         dayGz = lunar.getDayGanZhi();
-        // 只取前两字（干支），去掉可能的"日"字等后缀
-        dayGz = dayGz.slice(0, 2);
+      } else if (typeof lunar.dayGanZhi === 'function') {
+        dayGz = lunar.dayGanZhi();
+      } else if (typeof lunar.getDayGanZhi === 'function') {
+        dayGz = lunar.getDayGanZhi();
       }
-      console.log("[DEBUG] Month zhi:", monthZhi, "Day gz:", dayGz);
+      console.log("[DEBUG] Raw dayGz:", dayGz);
+      if (dayGz) {
+        dayGz = dayGz.slice(0, 2);
+      }console.log("[DEBUG] Month zhi:", monthZhi, "Day gz:", dayGz);
       if (monthZhi) mzSel.value = monthZhi;
       if (dayGz && dayGz.length === 2) {
         document.getElementById("day-gz").value = dayGz;

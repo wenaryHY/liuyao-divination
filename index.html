@@ -267,18 +267,31 @@ async function initSelects() {
       console.log("[DEBUG] Lunar.fromDate ok, lunar:", !!lunar);
       const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
       let dayGz = "";
-            console.log("[DEBUG] Lunar methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(lunar)).filter(m => m.includes('Day') || m.includes('Gan') || m.includes('Zhi')));
-      // Try all possible method names
-      const methodsToTry = ['getDayGanZhi', 'dayGanZhi', 'getDayGanzhi', 'getDayGanzhi', 'dayGanzhi'];
-      for (const method of methodsToTry) {
-        if (typeof lunar[method] === 'function') {
-          console.log("[DEBUG] Trying method:", method);
-          dayGz = lunar[method]();
-          console.log("[DEBUG] Method result:", dayGz);
-          if (dayGz) break;
-        }
-      }
-      console.log("[DEBUG] Raw dayGz:", dayGz);
+            console.log("[DEBUG] Lunar instance keys:", Object.keys(lunar).filter(m => m.includes('Day') || m.includes('Gan') || m.includes('Zhi')));
+            console.log("[DEBUG] Lunar prototype keys:", Object.getOwnPropertyNames(Object.getPrototypeOf(lunar)).filter(m => m.includes('Day') || m.includes('Gan') || m.includes('Zhi')));
+            const allKeys = Object.keys(lunar).concat(Object.getOwnPropertyNames(Object.getPrototypeOf(lunar)));
+            console.log("[DEBUG] All Lunar keys:", allKeys.filter(m => m.includes('Day') || m.includes('Gan') || m.includes('Zhi')));
+            
+            const methodsToTry = ['getDayGanZhi', 'dayGanZhi', 'getDayGanzhi', 'getDayGanzhi', 'dayGanzhi', 'getDayGan', 'dayGan', 'getDayGanzhi'];
+            for (const method of methodsToTry) {
+              if (typeof lunar[method] === 'function') {
+                console.log("[DEBUG] Trying method:", method);
+                dayGz = lunar[method]();
+                console.log("[DEBUG] Method result:", dayGz);
+                if (dayGz) break;
+              }
+            }
+            if (!dayGz) {
+              const propKeys = ['dayGanZhi', 'dayGanzhi', 'dayGan', 'dayGanzhi'];
+              for (const prop of propKeys) {
+                if (lunar[prop]) {
+                  console.log("[DEBUG] Found property:", prop, "=", lunar[prop]);
+                  dayGz = lunar[prop];
+                  break;
+                }
+              }
+            }
+            console.log("[DEBUG] Raw dayGz:", dayGz);
       if (dayGz) {
         dayGz = dayGz.slice(0, 2);
       }console.log("[DEBUG] Month zhi:", monthZhi, "Day gz:", dayGz);

@@ -268,12 +268,15 @@ async function initSelects() {
       const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
       let dayGz = "";
             console.log("[DEBUG] Lunar methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(lunar)).filter(m => m.includes('Day') || m.includes('Gan') || m.includes('Zhi')));
-      if (typeof lunar.getDayGanZhi === 'function') {
-        dayGz = lunar.getDayGanZhi();
-      } else if (typeof lunar.dayGanZhi === 'function') {
-        dayGz = lunar.dayGanZhi();
-      } else if (typeof lunar.getDayGanZhi === 'function') {
-        dayGz = lunar.getDayGanZhi();
+      // Try all possible method names
+      const methodsToTry = ['getDayGanZhi', 'dayGanZhi', 'getDayGanzhi', 'getDayGanzhi', 'dayGanzhi'];
+      for (const method of methodsToTry) {
+        if (typeof lunar[method] === 'function') {
+          console.log("[DEBUG] Trying method:", method);
+          dayGz = lunar[method]();
+          console.log("[DEBUG] Method result:", dayGz);
+          if (dayGz) break;
+        }
       }
       console.log("[DEBUG] Raw dayGz:", dayGz);
       if (dayGz) {

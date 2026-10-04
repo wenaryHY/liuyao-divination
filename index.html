@@ -256,15 +256,15 @@ async function initSelects() {
   // 默认当前时间填充月建/日干支
   const fillCurrentTime = () => {
     console.log("[DEBUG] fillCurrentTime called");
-    const Lunar = window.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
+    const Lunar = window.Lunar.Lunar || window.lunar || window.LunarJS || window["lunar-javascript"];
     if (!Lunar) {
       console.debug("[DEBUG] Lunar not ready");
       return false;
     }
     try {
       const now = new Date();
-      const lunar = Lunar.fromDate(now);
-      console.log("[DEBUG] Lunar.fromDate ok, lunar:", !!lunar);
+      const lunar = Lunar.Lunar.fromDate(now);
+      console.log("[DEBUG] Lunar.Lunar.fromDate ok, lunar:", !!lunar);
       const monthZhi = lunar.getMonthZhi ? lunar.getMonthZhi() : "";
       let dayGz = "";
       if (lunar.getDayGanZhi) {
@@ -427,7 +427,7 @@ function getFormArgs() {
     let dt = useCurrent ? new Date() : new Date($('#custom-time').value);
     if (isNaN(dt.getTime())) throw new Error('时间无效');
 
-    const lunar = window.Lunar.fromDate(dt);
+    const lunar = window.Lunar.Lunar.fromDate(dt);
     const hourZhi = lunar.getHourZhi(); // 时辰地支
     const dayZhi = lunar.getDayZhi();   // 日支
 
@@ -493,7 +493,7 @@ async function doCast() {
 /* ===== 构建 AI 解卦文本 ===== */
 function buildAIText(args, boardText) {
   const now = new Date();
-  const lunar = window.Lunar.fromDate(now);
+  const lunar = window.Lunar.Lunar.fromDate(now);
   const rulesIndex = JSON.parse(document.getElementById('ai-rules-index').textContent);
 
   let md = [];

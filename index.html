@@ -6866,6 +6866,19 @@ document.addEventListener('DOMContentLoaded', () => {
   initSelects();
   loadHistory();
   initPyodide();
+  // 参考文档折叠/展开
+  document.querySelectorAll('.ref-doc h3').forEach(h3 => {
+    h3.addEventListener('click', () => h3.parentElement.classList.toggle('collapsed'));
+  });
+  const toggleAll = document.getElementById('toggle-all-refs');
+  if (toggleAll) {
+    toggleAll.addEventListener('click', (e) => {
+      const all = document.querySelectorAll('.ref-doc');
+      const expand = !document.querySelector('.ref-doc:not(.collapsed)');
+      all.forEach(doc => doc.classList.toggle('collapsed', !expand));
+      e.target.textContent = expand ? '全部折叠' : '全部展开';
+    });
+  }
 });
 
 // 注册 Service Worker

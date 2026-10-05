@@ -91,6 +91,72 @@ pre {
 /* ===== 进度 ===== */
 #pyodide-progress { width: 100%; height: 4px; background: #eee; margin: 0.5rem 0; }
 #pyodide-progress > div { height: 100%; background: #000; width: 0%; transition: width 0.2s; }
+
+/* ===== 参考文档区域 ===== */
+.references-section {
+  padding: 1rem;
+  border-top: 2px solid #ccc;
+  background: #fafafa;
+}
+
+.references-section h2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #ccc;
+}
+
+.toggle-all {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #0066cc;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.ref-doc {
+  border: 1px solid #ddd;
+  margin-bottom: 0.5rem;
+  background: #fff;
+}
+
+.ref-doc h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  margin: 0;
+  background: #f0f0f0;
+  cursor: pointer;
+  font-size: 0.875rem;
+  border: none;
+}
+
+.ref-doc h3::after {
+  content: "▼";
+  font-size: 0.6rem;
+  transition: transform 0.2s;
+}
+
+.ref-doc.collapsed h3::after {
+  transform: rotate(-90deg);
+}
+
+.ref-content {
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.ref-doc.collapsed .ref-content {
+  display: none;
+}
 </style>
 </head>
 <body>
@@ -169,6 +235,9 @@ pre {
     <pre id="ai-output" class="output" aria-label="AI 解卦结构化文本">等待起卦...</pre>
   </section>
 </main>
+
+<!-- 参考文档区域 -->
+<section id="references" class="references-section"></section>
 
 <footer>
   <div class="btn-group">
@@ -506,15 +575,7 @@ function buildAIText(args, boardText) {
   const now = new Date();
   const lunar = window.Lunar.Lunar.fromDate(now);
   const rulesIndex = JSON.parse(document.getElementById('ai-rules-index').textContent);
-  
-  // Get full embedded reference data
-  const INLINE = window.INLINE_DATA || {};
-  const REFS = INLINE.REFS_CONTENT || {};
-  const GOLDEN = INLINE.GOLDEN_CASES || [];
-  const BEGINNER = INLINE.BEGINNER_GUIDE || [];
-  const GUIDE = INLINE.GUIDE || '';
-  const GLOSSARY = INLINE.GLOSSARY || {};
-  const ZHOUYI = INLINE.ZHOUYI_DATA || {};
+  const BASE = 'https://wenary.me/';
 
   let md = [];
   md.push('# 六爻排盘 - AI 解卦参考');
@@ -530,70 +591,19 @@ function buildAIText(args, boardText) {
   md.push(boardText);
   md.push('```');
   md.push('');
-  md.push('## 断卦流程参考文档（完整内嵌，无需联网）');
+  md.push('## 断卦流程目录（请访问 wenary.me 对应区域阅读完整规则）');
   rulesIndex.forEach(r => {
-    md.push(`### ${r.step}. ${r.title}`);
-    if (REFS[r.step]) {
-      md.push('');
-      md.push('---');
-      md.push(`#### 参考文档：${r.title}`);
-      md.push('');
-      md.push(REFS[r.step]);
-      md.push('');
-      md.push('---');
-    }
-    md.push('');
+    md.push(`${r.step}. [${r.title}](${BASE}#ref-${r.step})`);
   });
-  
-  // 嵌入术语词汇表
-  if (Object.keys(GLOSSARY).length > 0) {
-    md.push('---');
-    md.push('## 术语词汇表');
-    md.push('');
-    Object.entries(GLOSSARY).forEach(([term, def]) => {
-      md.push(`- **${term}**：${def}`);
-    });
-    md.push('');
-  }
-  
-  // 嵌入黄金卦例
-  if (GOLDEN.length > 0) {
-    md.push('---');
-    md.push('## 黄金卦例（实战案例）');
-    md.push('');
-    GOLDEN.forEach((c, i) => {
-      md.push(`### 案例 ${i+1}: ${c.title || ''}`);
-      if (c.question) md.push(`- **占问**：${c.question}`);
-      if (c.hexagram) md.push(`- **得卦**：${c.hexagram}`);
-      if (c.analysis) md.push(`- **断语**：${c.analysis}`);
-      if (c.outcome) md.push(`- **验证**：${c.outcome}`);
-      md.push('');
-    });
-  }
-  
-  // 嵌入入门教程
-  if (BEGINNER.length > 0) {
-    md.push('---');
-    md.push('## 六爻入门教程');
-    md.push('');
-    BEGINNER.forEach((item, i) => {
-      if (item.title) md.push(`### ${item.title}`);
-      if (item.content) md.push(item.content);
-      md.push('');
-    });
-  }
-  
-  // 嵌入卜卦指南
-  if (GUIDE) {
-    md.push('---');
-    md.push('## 卜卦指南');
-    md.push('');
-    md.push(GUIDE);
-    md.push('');
-  }
-
+  md.push('');
+  md.push('## 附加参考');
+  md.push(`- [术语词汇表](${BASE}#glossary)`);
+  md.push(`- [黄金卦例](${BASE}#golden-cases)`);
+  md.push(`- [入门教程](${BASE}#beginner)`);
+  md.push(`- [卜卦指南](${BASE}#guide)`);
+  md.push('');
   md.push('---');
-  md.push('**重要提示**：以上所有参考资料（11步断卦规则、术语词汇表、64卦完整数据、黄金卦例、入门教程、卜卦指南）均已完整内嵌在页面中，AI 可直接离线访问，无需联网。');
+  md.push('**说明**：以上链接为页面锚点，打开 wenary.me 后会自动滚动到对应区域。完整规则请在网页中阅读。');
   md.push('');
   return md.join('\n');
 }
@@ -704,10 +714,95 @@ $('#btn-import-history').addEventListener('click', () => $('#import-file').click
 $('#import-file').addEventListener('change', e => { if(e.target.files[0]) importHistory(e.target.files[0]); });
 
 /* ===== 启动 ===== */
+function escapeHtml(text) {
+  return text.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>');
+}
+
+function renderReferences() {
+  const INLINE = window.INLINE_DATA || {};
+  const REFS = INLINE.REFS_CONTENT || {};
+  const GLOSSARY = INLINE.GLOSSARY || {};
+  const GOLDEN = INLINE.GOLDEN_CASES || [];
+  const BEGINNER = INLINE.BEGINNER_GUIDE || [];
+  const GUIDE = INLINE.GUIDE || '';
+  
+  const container = document.getElementById('references');
+  if (!container) return;
+  
+  const rulesIndex = JSON.parse(document.getElementById('ai-rules-index').textContent);
+  
+  let html = '<h2>参考文档 <span class="toggle-all" id="toggle-all-refs">全部展开</span></h2>';
+  
+  // 11 步规则
+  rulesIndex.forEach(r => {
+    const content = REFS[r.step] || '';
+    html += `<section id="ref-${r.step}" class="ref-doc collapsed">
+      <h3>${r.step}. ${r.title}</h3>
+      <div class="ref-content">${escapeHtml(content)}</div>
+    </section>`;
+  });
+  
+  // 术语表
+  if (Object.keys(GLOSSARY).length) {
+    let content = Object.entries(GLOSSARY).map(([k,v]) => `**${k}**：${v}`).join('\n\n');
+    html += `<section id="glossary" class="ref-doc collapsed">
+      <h3>术语词汇表</h3>
+      <div class="ref-content">${escapeHtml(content)}</div>
+    </section>`;
+  }
+  
+  // 黄金卦例
+  if (GOLDEN.length) {
+    let content = GOLDEN.map((c,i) => 
+      `### 案例 ${i+1}: ${c.title || ''}\n${c.question ? '**占问**：' + c.question + '\n' : ''}${c.hexagram ? '**得卦**：' + c.hexagram + '\n' : ''}${c.analysis ? '**断语**：' + c.analysis + '\n' : ''}${c.outcome ? '**验证**：' + c.outcome : ''}`
+    ).join('\n\n');
+    html += `<section id="golden-cases" class="ref-doc collapsed">
+      <h3>黄金卦例</h3>
+      <div class="ref-content">${escapeHtml(content)}</div>
+    </section>`;
+  }
+  
+  // 入门教程
+  if (BEGINNER.length) {
+    let content = BEGINNER.map(b => `${b.title ? '### ' + b.title + '\n' : ''}${b.content || ''}`).join('\n\n');
+    html += `<section id="beginner" class="ref-doc collapsed">
+      <h3>入门教程</h3>
+      <div class="ref-content">${escapeHtml(content)}</div>
+    </section>`;
+  }
+  
+  // 卜卦指南
+  if (GUIDE) {
+    html += `<section id="guide" class="ref-doc collapsed">
+      <h3>卜卦指南</h3>
+      <div class="ref-content">${escapeHtml(GUIDE)}</div>
+    </section>`;
+  }
+  
+  container.innerHTML = html;
+  
+  // 绑定点击展开/折叠
+  container.querySelectorAll('.ref-doc h3').forEach(h3 => {
+    h3.addEventListener('click', () => h3.parentElement.classList.toggle('collapsed'));
+  });
+  
+  // 全部展开/折叠
+  const toggleAll = document.getElementById('toggle-all-refs');
+  if (toggleAll) {
+    toggleAll.addEventListener('click', (e) => {
+      const all = container.querySelectorAll('.ref-doc');
+      const expand = !container.querySelector('.ref-doc:not(.collapsed)');
+      all.forEach(doc => doc.classList.toggle('collapsed', !expand));
+      e.target.textContent = expand ? '全部折叠' : '全部展开';
+    });
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initSelects();
   loadHistory();
   initPyodide();
+  renderReferences();
 });
 
 // 注册 Service Worker

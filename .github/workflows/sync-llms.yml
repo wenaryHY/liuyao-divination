@@ -1,0 +1,53 @@
+name: Sync llms.txt & Deploy Pages
+
+on:
+  push:
+    branches: [main, pages]
+    paths:
+      - 'inline-data.json'
+      - 'scripts/generate-llms.mjs'
+      - '.github/workflows/sync-llms.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Generate llms files
+        run: node scripts/generate-llms.mjs
+        
+      - name: Commit & Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add llms.txt llms-full.txt
+          git diff --staged --quiet || git commit -m "chore: auto-update llms.txt [skip ci]"
+          git push
+
+  deploy-pages:
+    needs: generate
+    if: github.ref == 'refs/heads/pages'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          destination_dir: .
+          keep_files: true

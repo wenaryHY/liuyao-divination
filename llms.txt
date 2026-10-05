@@ -1,0 +1,41 @@
+# 六爻排盘 - AI 解卦知识库
+
+> 传统纳甲筮法完整参考文档，包含 11 步断卦流程、术语词汇表、黄金卦例、入门教程、卜卦指南、64 卦完整数据（卦辞、爻辞、宫属、世爻）。
+
+*更新时间：2026-10-05 | Commit: 0eaa24f*
+
+## 快速导航
+
+### 断卦流程 11 步
+- [1. 排盘定盘](https://wenary.me/#ref-1)
+- [2. 取用神](https://wenary.me/#ref-2)
+- [3. 用神旺衰（月令/日令/十二长生）](https://wenary.me/#ref-3)
+- [4. 世爻状态](https://wenary.me/#ref-4)
+- [5. 查动静、暗动、月破、日破](https://wenary.me/#ref-5)
+- [6. 查化变（进退神化）](https://wenary.me/#ref-6)
+- [7. 查合冲刑害](https://wenary.me/#ref-7)
+- [8. 查墓库、空亡](https://wenary.me/#ref-8)
+- [9. 推算节气/大小月/小日](https://wenary.me/#ref-9)
+- [10. 发动墓库与空亡](https://wenary.me/#ref-10)
+- [11. 实战案例参考](https://wenary.me/#ref-11)
+
+### 附加参考
+- [术语词汇表](https://wenary.me/#glossary) (49 术语)
+- [黄金卦例](https://wenary.me/#golden-cases) (1 详细案例)
+- [入门教程](https://wenary.me/#beginner) (1 课程)
+- [卜卦指南](https://wenary.me/#guide) (完整操作手册)
+- [64 卦完整数据](https://wenary.me/#hexagrams) (卦辞、爻辞、宫属、世爻、纳甲)
+
+## 全量内容
+
+- [llms-full.txt](https://wenary.me/llms-full.txt) - 完整 Markdown 内容
+
+## 来源
+
+- 网站: https://wenary.me/
+- 仓库: https://github.com/wenaryHY/liuyao-divination
+- 更新: GitHub Actions 自动同步
+
+---
+
+*本文件遵循 [llms.txt 标准](https://llmstxt.org/)*

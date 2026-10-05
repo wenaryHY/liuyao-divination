@@ -6387,6 +6387,7 @@ pre {
   <div class="btn-group">
     <button id="btn-copy-board" type="button" disabled>复制卦盘信息</button>
     <button id="btn-copy-ai" type="button" disabled>复制 AI 文本</button>
+    <button id="btn-download-offline" type="button" disabled>下载离线包</button>
     <button id="btn-export-history" type="button" class="secondary">导出历史</button>
     <button id="btn-import-history" type="button" class="secondary">导入历史</button>
     <input id="import-file" type="file" accept=".json,.jsonl" hidden>
@@ -6699,6 +6700,7 @@ async function doCast() {
     // 启用复制按钮
     $('#btn-copy-board').disabled = false;
     $('#btn-copy-ai').disabled = false;
+    $('#btn-download-offline').disabled = false;
 
     // 保存历史
     saveHistory(args, boardText, aiText);
@@ -6735,15 +6737,22 @@ function buildAIText(args, boardText) {
   md.push(boardText);
   md.push('```');
   md.push('');
-  md.push('## 知识库访问指南');
+  md.push('## 知识库访问方式（三选一）');
   md.push('');
-  md.push(`- **完整知识库索引**: [${BASE}llms.txt](${BASE}llms.txt) (含所有章节导航、更新时间、Git Commit)`);
-  md.push(`- **完整知识库全量**: [${BASE}llms-full.txt](${BASE}llms-full.txt) (~200KB，含 11 步规则、术语表、卦例、教程、指南、64卦完整爻辞)`);
+  md.push('### 方式 1：在线索引（推荐有联网 AI）');
+  md.push(`- [llms.txt](${BASE}llms.txt) - 完整目录、更新时间、Git Commit`);
+  md.push(`- [llms-full.txt](${BASE}llms-full.txt) - 全量内容 (~200KB)`);
   md.push('');
-  md.push('## 断卦流程目录（页面锚点）');
+  md.push('### 方式 2：页面锚点（推荐有联网 AI）');
   rulesIndex.forEach(r => {
     md.push(`${r.step}. [${r.title}](${BASE}#ref-${r.step})`);
   });
+  md.push('');
+  md.push('### 方式 3：离线附件（推荐无联网 AI）');
+  md.push('- 点击页面「下载离线包」按钮 → 得到 `.md` 文件');
+  md.push('- 将该文件作为附件上传给 AI');
+  md.push('- AI 直接阅读附件，**完全无需联网**');
+  md.push('- 附件包含：排盘结果 + 完整知识库 + 解卦提示词');
   md.push('');
   md.push('## 附加参考（页面锚点）');
   md.push(`- [术语词汇表](${BASE}#glossary)`);
@@ -6753,7 +6762,7 @@ function buildAIText(args, boardText) {
   md.push(`- [64卦完整数据](${BASE}#hexagrams)`);
   md.push('');
   md.push('---');
-  md.push('**重要**：无法联网的 AI 请直接读取上方 llms.txt / llms-full.txt 链接；有联网能力的 AI 可直接访问 wenary.me 页面锚点。两种方式内容完全同步，通过 GitHub Actions 自动更新。');
+  md.push('**重要**：三种方式内容完全同步。无联网 AI 请用方式 3（下载离线包 → 上传附件）；有联网 AI 推荐方式 1 或 2。');
   md.push('');
   return md.join('\n');
 }
@@ -6841,6 +6850,72 @@ function downloadAsFile(text, filename) {
   URL.revokeObjectURL(url);
 }
 
+/* ===== 下载离线解卦包 (.md) ===== */
+function downloadOfflinePackage() {
+  const boardText = $('#board-output').textContent;
+  const aiText = $('#ai-output').textContent;
+  if (!boardText || boardText === '等待起卦...') {
+    alert('请先起卦');
+    return;
+  }
+
+  // Get hexagram name for filename
+  const method = $('#method').value;
+  let hexName = '未知卦';
+  if (method === 'manual') {
+    hexName = $('#hexagram').value;
+  } else {
+    // Extract from board text (first line usually has hexagram name)
+    const firstLine = boardText.split('\n')[0];
+    const match = firstLine.match(/【(.*?)】/);
+    if (match) hexName = match[1];
+  }
+
+  const now = new Date();
+  const timestamp = now.getFullYear() +
+    String(now.getMonth()+1).padStart(2,'0') +
+    String(now.getDate()).padStart(2,'0') + '-' +
+    String(now.getHours()).padStart(2,'0') +
+    String(now.getMinutes()).padStart(2,'0');
+
+  // Load llms-full.txt content from inline data
+  const INLINE = window.INLINE_DATA || {};
+  const fullContent = [
+    '# 六爻排盘 - 离线解卦包',
+    '',
+    `> 生成时间：${now.toLocaleString()} | 卦名：${hexName}`,
+    '',
+    '## 1. 当前排盘结果',
+    '',
+    '```',
+    boardText,
+    '```',
+    '',
+    '## 2. 完整知识库 (llms-full.txt)',
+    '',
+    INLINE.GUIDE ? INLINE.GUIDE : '',
+    '',
+    '---',
+    '',
+    '## 3. 解卦提示词',
+    '',
+    '请基于上方「完整知识库」进行断卦，**无需联网查询**，直接阅读附件内容即可。',
+    '',
+    '### 断卦要求：',
+    '1. 按 11 步流程逐项分析（排盘定盘 → 取用神 → 旺衰 → 世爻状态 → 动静暗破 → 化变 → 合冲刑害 → 墓库空亡 → 综合定性 → 推算节气 → 发动墓库空亡）',
+    '2. 引用规则时注明出处（如：参考「3. 用神旺衰」）',
+    '3. 给出明确结论：吉/凶、应期、关键爻位',
+    '4. 若信息不足，说明需要补充什么条件',
+    '',
+    '---',
+    '',
+    `*生成自 https://wenary.me/ | ${now.toISOString()}*`
+  ].join('\n');
+
+  const filename = `liuyao-offline-${hexName.replace(/[<>:\"/\\|?*]/g,'')}-${timestamp}.md`;
+  downloadAsFile(fullContent, filename);
+}
+
 /* ===== 事件绑定 ===== */
 $('#btn-cast').addEventListener('click', doCast);
 $('#btn-clear').addEventListener('click', () => {
@@ -6848,6 +6923,7 @@ $('#btn-clear').addEventListener('click', () => {
   $('#ai-output').textContent = '等待起卦...';
   $('#btn-copy-board').disabled = true;
   $('#btn-copy-ai').disabled = true;
+  $('#btn-download-offline').disabled = true;
   $('#status').textContent = '';
 });
 $('#btn-copy-board').addEventListener('click', () => copyText($('#board-output').textContent, '卦盘信息'));
@@ -6859,6 +6935,7 @@ $('#btn-copy-ai').addEventListener('click', () => {
     copyText(aiText, 'AI 解卦文本');
   }
 });
+$('#btn-download-offline').addEventListener('click', downloadOfflinePackage);
 $('#btn-export-history').addEventListener('click', exportHistory);
 $('#btn-import-history').addEventListener('click', () => $('#import-file').click());
 $('#import-file').addEventListener('change', e => { if(e.target.files[0]) importHistory(e.target.files[0]); });

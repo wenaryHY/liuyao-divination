@@ -202,6 +202,8 @@ pre {
 <script>
   console.log("[DEBUG] Lunar loaded from local bundle:", Object.keys(window.Lunar).slice(0,5));
 </script>
+<!-- Inline reference data -->
+<script src="inline-data.js"></script>
 <script>
   function waitForLunar() {
     return new Promise(resolve => {
@@ -508,6 +510,15 @@ function buildAIText(args, boardText) {
   const now = new Date();
   const lunar = window.Lunar.Lunar.fromDate(now);
   const rulesIndex = JSON.parse(document.getElementById('ai-rules-index').textContent);
+  
+  // Get full embedded reference data
+  const INLINE = window.INLINE_DATA || {};
+  const REFS = INLINE.REFS_CONTENT || {};
+  const GOLDEN = INLINE.GOLDEN_CASES || [];
+  const BEGINNER = INLINE.BEGINNER_GUIDE || [];
+  const GUIDE = INLINE.GUIDE || '';
+  const GLOSSARY = INLINE.GLOSSARY || {};
+  const ZHOUYI = INLINE.ZHOUYI_DATA || {};
 
   let md = [];
   md.push('# 六爻排盘 - AI 解卦参考');
@@ -523,27 +534,71 @@ function buildAIText(args, boardText) {
   md.push(boardText);
   md.push('```');
   md.push('');
-  md.push('## 断卦流程目录（请逐条访问链接获取详细规则）');
+  md.push('## 断卦流程参考文档（完整内嵌，无需联网）');
   rulesIndex.forEach(r => {
     md.push(`### ${r.step}. ${r.title}`);
-    // Embed actual reference content instead of just link
-    if (REFS_CONTENT[r.step]) {
+    if (REFS[r.step]) {
       md.push('');
       md.push('---');
       md.push(`#### 参考文档：${r.title}`);
       md.push('');
-      md.push(REFS_CONTENT[r.step]);
+      md.push(REFS[r.step]);
       md.push('');
       md.push('---');
     }
-    md.push(`- 文档链接：${GITHUB_BASE}${r.file}`);
     md.push('');
   });
+  
+  // 嵌入术语词汇表
+  if (Object.keys(GLOSSARY).length > 0) {
+    md.push('---');
+    md.push('## 术语词汇表');
+    md.push('');
+    Object.entries(GLOSSARY).forEach(([term, def]) => {
+      md.push(`- **${term}**：${def}`);
+    });
+    md.push('');
+  }
+  
+  // 嵌入黄金卦例
+  if (GOLDEN.length > 0) {
+    md.push('---');
+    md.push('## 黄金卦例（实战案例）');
+    md.push('');
+    GOLDEN.forEach((c, i) => {
+      md.push(`### 案例 ${i+1}: ${c.title || ''}`);
+      if (c.question) md.push(`- **占问**：${c.question}`);
+      if (c.hexagram) md.push(`- **得卦**：${c.hexagram}`);
+      if (c.analysis) md.push(`- **断语**：${c.analysis}`);
+      if (c.outcome) md.push(`- **验证**：${c.outcome}`);
+      md.push('');
+    });
+  }
+  
+  // 嵌入入门教程
+  if (BEGINNER.length > 0) {
+    md.push('---');
+    md.push('## 六爻入门教程');
+    md.push('');
+    BEGINNER.forEach((item, i) => {
+      if (item.title) md.push(`### ${item.title}`);
+      if (item.content) md.push(item.content);
+      md.push('');
+    });
+  }
+  
+  // 嵌入卜卦指南
+  if (GUIDE) {
+    md.push('---');
+    md.push('## 卜卦指南');
+    md.push('');
+    md.push(GUIDE);
+    md.push('');
+  }
+
   md.push('---');
-  md.push('**重要提示**：以上规则仅为目录索引，具体断卦细则必须逐条访问上述 GitHub Raw 链接查阅完整文档。未联网查阅视为断卦失败。');
+  md.push('**重要提示**：以上所有参考资料（11步断卦规则、术语词汇表、64卦完整数据、黄金卦例、入门教程、卜卦指南）均已完整内嵌在页面中，AI 可直接离线访问，无需联网。');
   md.push('');
-  md.push('## 卦例参考');
-  md.push(`- 实战案例：${GITHUB_BASE}11-%E5%AE%9E%E6%88%98%E6%A1%88%E4%BE%8B%E6%96%87%E6%9C%AC.md`);
   return md.join('\n');
 }
 
@@ -608,13 +663,26 @@ async function copyText(text, label) {
     await navigator.clipboard.writeText(text);
     alert(`${label} 已复制到剪贴板`);
   } catch {
-    // 降级
+    // 降级：textarea
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta);
     ta.select(); document.execCommand('copy');
     ta.remove();
     alert(`${label} 已复制 (降级)`);
   }
+}
+
+/* ===== 下载为文件（解决剪贴板大文本限制）===== */
+function downloadAsFile(text, filename) {
+  const blob = new Blob([text], {type: 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* ===== 事件绑定 ===== */
@@ -627,7 +695,14 @@ $('#btn-clear').addEventListener('click', () => {
   $('#status').textContent = '';
 });
 $('#btn-copy-board').addEventListener('click', () => copyText($('#board-output').textContent, '卦盘信息'));
-$('#btn-copy-ai').addEventListener('click', () => copyText($('#ai-output').textContent, 'AI 解卦文本'));
+$('#btn-copy-ai').addEventListener('click', () => {
+  const aiText = $('#ai-output').textContent;
+  if (aiText.length > 50000) {
+    downloadAsFile(aiText, `liuyao-ai-${Date.now()}.txt`);
+  } else {
+    copyText(aiText, 'AI 解卦文本');
+  }
+});
 $('#btn-export-history').addEventListener('click', exportHistory);
 $('#btn-import-history').addEventListener('click', () => $('#import-file').click());
 $('#import-file').addEventListener('change', e => { if(e.target.files[0]) importHistory(e.target.files[0]); });

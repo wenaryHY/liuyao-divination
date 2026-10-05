@@ -6878,8 +6878,50 @@ function downloadOfflinePackage() {
     String(now.getHours()).padStart(2,'0') +
     String(now.getMinutes()).padStart(2,'0');
 
-  // Load llms-full.txt content from inline data
+  // Load inline data
   const INLINE = window.INLINE_DATA || {};
+
+  // Helper: step title map
+  function getStepTitle(step) {
+    const titles = {
+      '01': '排盘定盘', '02': '取用神', '03': '用神旺衰（月令/日令/十二长生）',
+      '04': '世爻状态', '05': '查动静、暗动、月破、日破',
+      '06': '查化变（进退神化）', '07': '查合冲刑害', '08': '查墓库、空亡',
+      '09': '推算节气/大小月/小日', '10': '发动墓库与空亡', '11': '实战案例参考'
+    };
+    return titles[step] || '';
+  }
+
+  // Helper: format golden cases
+  function formatGoldenCases(g) {
+    if (!g || typeof g !== 'object') return '';
+    const parts = [];
+    if (g.title) parts.push(`### ${g.title}`);
+    if (g.subtitle) parts.push(g.subtitle);
+    if (g.meta?.question) parts.push(`**占问**：${g.meta.question}`);
+    if (g.board?.hexagram) parts.push(`**得卦**：${g.board.hexagram}`);
+    if (g.summary) parts.push(`**断语**：${g.summary}`);
+    if (g.verdict) parts.push(`**验证**：${Array.isArray(g.verdict) ? g.verdict.join('；') : g.verdict}`);
+    return parts.filter(Boolean).join('\n\n');
+  }
+
+  // Helper: format beginner guide
+  function formatBeginner(b) {
+    if (!b || typeof b !== 'object') return '';
+    const parts = [];
+    if (b.title) parts.push(`### ${b.title}`);
+    if (b.subtitle) parts.push(b.subtitle);
+    if (b.meta?.question) parts.push(`**问题**：${b.meta.question}`);
+    if (b.summary) parts.push(`**总结**：${b.summary}`);
+    if (b.sections) {
+      b.sections.forEach(s => {
+        if (s.title) parts.push(`#### ${s.title}`);
+        if (s.content) parts.push(s.content);
+      });
+    }
+    return parts.filter(Boolean).join('\n\n');
+  }
+
   const fullContent = [
     '# 六爻排盘 - 离线解卦包',
     '',
@@ -6891,9 +6933,27 @@ function downloadOfflinePackage() {
     boardText,
     '```',
     '',
-    '## 2. 完整知识库 (llms-full.txt)',
+    '## 2. 完整知识库',
     '',
-    INLINE.GUIDE ? INLINE.GUIDE : '',
+    '### 2.1 11 步断卦流程',
+    Object.entries(INLINE.REFS_CONTENT || {})
+      .sort(([a], [b]) => parseInt(a) - parseInt(b))
+      .map(([step, content]) => `#### ${step}. ${getStepTitle(step)}\n\n${content}`)
+      .join('\n\n---\n\n'),
+    '',
+    '### 2.2 术语词汇表',
+    Object.entries(INLINE.GLOSSARY || {})
+      .map(([k, v]) => `**${k}**：${v}`)
+      .join('\n\n'),
+    '',
+    '### 2.3 黄金卦例',
+    formatGoldenCases(INLINE.GOLDEN_CASES),
+    '',
+    '### 2.4 入门教程',
+    formatBeginner(INLINE.BEGINNER_GUIDE),
+    '',
+    '### 2.5 卜卦指南',
+    INLINE.GUIDE || '',
     '',
     '---',
     '',
@@ -6910,7 +6970,7 @@ function downloadOfflinePackage() {
     '---',
     '',
     `*生成自 https://wenary.me/ | ${now.toISOString()}*`
-  ].join('\n');
+  ].join('\n\n');
 
   const filename = `liuyao-offline-${hexName.replace(/[<>:\"/\\|?*]/g,'')}-${timestamp}.md`;
   downloadAsFile(fullContent, filename);

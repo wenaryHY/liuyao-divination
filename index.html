@@ -735,7 +735,8 @@ function renderReferences() {
   
   // 11 步规则
   rulesIndex.forEach(r => {
-    const content = REFS[r.step] || '';
+    const stepKey = String(r.step).padStart(2, '0'); // REFS_CONTENT 用 "01", "02" 等
+    const content = REFS[stepKey] || '';
     html += `<section id="ref-${r.step}" class="ref-doc collapsed">
       <h3>${r.step}. ${r.title}</h3>
       <div class="ref-content">${escapeHtml(content)}</div>
